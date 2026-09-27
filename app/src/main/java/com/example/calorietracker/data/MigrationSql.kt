@@ -36,3 +36,9 @@ internal val MIGRATION_2_3_SQL = listOf(
     "ALTER TABLE `recipes` ADD COLUMN `cookedWeight` REAL",
     "CREATE TABLE IF NOT EXISTS `diets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `proteinPct` INTEGER NOT NULL, `fatPct` INTEGER NOT NULL, `carbsPct` INTEGER NOT NULL, `calorieAdjustPct` INTEGER NOT NULL, `mealsPerDay` INTEGER NOT NULL, `recommended` TEXT NOT NULL, `avoid` TEXT NOT NULL, `isBuiltin` INTEGER NOT NULL)",
 )
+
+/** Statements for MIGRATION_3_4, derived from the exported schema 4.json. */
+internal val MIGRATION_3_4_SQL = listOf(
+    "ALTER TABLE `recipes` ADD COLUMN `imageUrl` TEXT",
+    "ALTER TABLE `recipes` ADD COLUMN `externalId` TEXT",
+)

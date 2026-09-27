@@ -55,6 +55,7 @@ object Routes {
     const val DIET_EDIT = "diet_edit?dietId={dietId}"
     const val ACCOUNT = "account"
     const val ONBOARDING = "onboarding"
+    const val WORLD_RECIPE = "world_recipe/{mealId}"
 
     fun addFood(day: Long, meal: MealType) = "add_food/$day/${meal.name}"
     fun scan(day: Long, meal: MealType) = "scan/$day/${meal.name}"
@@ -166,6 +167,7 @@ fun AppNavHost(startOnboarding: Boolean = false) {
         composable(Routes.RECIPES) {
             RecipesScreen(
                 onOpen = { navController.navigate(Routes.recipe(it, today, mealForCurrentTime())) },
+                onOpenWorld = { navController.navigate("world_recipe/$it") },
                 onCreate = { navController.navigate(Routes.recipeEdit()) },
                 bottomBar = bottomBar
             )
@@ -274,5 +276,12 @@ fun AppNavHost(startOnboarding: Boolean = false) {
             )
         }
         detail(Routes.ACCOUNT) { AccountScreen(onBack = back) }
+        detail(Routes.WORLD_RECIPE, listOf(navArgument("mealId") { type = NavType.StringType })) {
+            WorldRecipeScreen(
+                onSaved = { id -> navController.navigate(Routes.recipe(id, today, mealForCurrentTime())) },
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onBack = back
+            )
+        }
     }
 }

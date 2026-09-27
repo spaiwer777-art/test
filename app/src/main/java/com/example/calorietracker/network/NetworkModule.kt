@@ -32,6 +32,10 @@ object NetworkModule {
         retrofit("https://search.openfoodfacts.org/").create(OffSearchApi::class.java)
     }
 
+    val mealDbApi: MealDbApi by lazy {
+        retrofit("https://www.themealdb.com/api/json/v1/1/").create(MealDbApi::class.java)
+    }
+
     val groqApi: GroqApi by lazy {
         retrofit("https://api.groq.com/").create(GroqApi::class.java)
     }

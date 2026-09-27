@@ -41,6 +41,9 @@ interface RecipeDao {
     @Query("SELECT * FROM recipe_ingredients")
     suspend fun allIngredients(): List<RecipeIngredient>
 
+    @Query("SELECT * FROM recipes WHERE externalId = :externalId LIMIT 1")
+    suspend fun findByExternal(externalId: String): Recipe?
+
     @Query("SELECT id, name FROM recipes WHERE isBuiltin = 1")
     suspend fun builtinNames(): List<IdName>
 

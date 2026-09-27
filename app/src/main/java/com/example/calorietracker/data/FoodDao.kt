@@ -29,6 +29,18 @@ interface FoodDao {
     )
     fun search(query: String, sources: List<FoodSource>): Flow<List<Food>>
 
+    /**
+     * Candidates for a multi-word search: rows whose searchName matches [pattern]
+     * (a LIKE pattern built from the most specific word). The remaining words are
+     * checked in Kotlin, see FoodRepository.searchFoods.
+     */
+    @Query("SELECT * FROM foods WHERE searchName LIKE :pattern AND source IN (:sources) LIMIT 1000")
+    suspend fun candidates(pattern: String, sources: List<FoodSource>): List<Food>
+
+    /** Emits whenever the foods table changes, to re-run searches. */
+    @Query("SELECT COUNT(*) FROM foods")
+    fun changes(): Flow<Int>
+
     /** Reference bases, RU first: used to ground AI ingredient estimates. */
     @Query("SELECT * FROM foods WHERE source IN ('BUILTIN', 'USDA') ORDER BY CASE source WHEN 'BUILTIN' THEN 0 ELSE 1 END, id")
     suspend fun builtin(): List<Food>

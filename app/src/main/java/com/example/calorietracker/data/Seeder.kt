@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.first
  * data and diary entries (which snapshot their values) are untouched.
  */
 object Seeder {
-    private const val SEED_VERSION = 3
+    private const val SEED_VERSION = 4
 
     suspend fun run(context: Context, db: AppDatabase, settings: SettingsRepository) {
         backfillSearchNames(db)

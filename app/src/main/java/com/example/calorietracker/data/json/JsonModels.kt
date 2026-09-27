@@ -106,3 +106,13 @@ data class BackupData(
     val refFoodNames: Map<Long, String>,
     val refRecipeNames: Map<Long, String>
 )
+
+/** AI translation of a TheMealDB recipe into a Russian recipe with ingredient weights. */
+data class AiRecipeJson(
+    val name: String?,
+    val servings: Int?,
+    val minutes: Int?,
+    val category: String?,
+    val steps: List<String>?,
+    val items: List<AiItemJson>?
+)

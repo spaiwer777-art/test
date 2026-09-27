@@ -29,7 +29,7 @@ class Converters {
         Food::class, DiaryEntry::class, Recipe::class, RecipeIngredient::class,
         MealPhoto::class, WeightEntry::class, WaterEntry::class, MealPlanEntity::class, Diet::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -50,7 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "calorie_tracker.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { INSTANCE = it }
             }
     }
 }
@@ -66,5 +66,12 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
 val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
         MIGRATION_2_3_SQL.forEach(db::execSQL)
+    }
+}
+
+/** v3 -> v4: photo and external id for recipes. */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        MIGRATION_3_4_SQL.forEach(db::execSQL)
     }
 }

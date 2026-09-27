@@ -1,6 +1,15 @@
 package com.example.calorietracker.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -76,7 +85,7 @@ fun recipeCategoryIcon(category: String): ImageVector = when (category) {
 fun recipeCategoryColor(): Color = MaterialTheme.colorScheme.primary
 
 @Composable
-fun RecipesScreen(onOpen: (Long) -> Unit, onCreate: () -> Unit, bottomBar: @Composable () -> Unit) {
+fun RecipesScreen(onOpen: (Long) -> Unit, onOpenWorld: (String) -> Unit, onCreate: () -> Unit, bottomBar: @Composable () -> Unit) {
     val vm: RecipesViewModel = viewModel()
     val recipes by vm.recipes.collectAsState()
     val query by vm.query.collectAsState()
@@ -85,7 +94,8 @@ fun RecipesScreen(onOpen: (Long) -> Unit, onCreate: () -> Unit, bottomBar: @Comp
     val diet by vm.activeDiet.collectAsState()
     RecipesContent(
         recipes, query, category, { vm.query.value = it }, { vm.category.value = it }, onOpen, onCreate, bottomBar,
-        dietName = diet?.name, onlyDiet = onlyDiet, onOnlyDiet = { vm.onlyDiet.value = it }
+        dietName = diet?.name, onlyDiet = onlyDiet, onOnlyDiet = { vm.onlyDiet.value = it },
+        worldPane = { header -> WorldRecipesPane(onOpen = onOpenWorld, header = header) }
     )
 }
 
@@ -102,20 +112,33 @@ internal fun RecipesContent(
     bottomBar: @Composable () -> Unit,
     dietName: String? = null,
     onlyDiet: Boolean = false,
-    onOnlyDiet: (Boolean) -> Unit = {}
+    onOnlyDiet: (Boolean) -> Unit = {},
+    worldPane: (@Composable (header: @Composable () -> Unit) -> Unit)? = null
 ) {
+    var world by rememberSaveable { mutableStateOf(false) }
+    val toggle: @Composable () -> Unit = {
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            SegmentedButton(selected = !world, onClick = { world = false }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("Мои и базовые") }
+            SegmentedButton(selected = world, onClick = { world = true }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Мировые с фото") }
+        }
+    }
     Scaffold(
         topBar = { TopAppBar(title = { Text("Рецепты", style = MaterialTheme.typography.headlineSmall) }) },
         bottomBar = bottomBar,
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = onCreate, icon = { Icon(Icons.Filled.Add, null) }, text = { Text("Свой рецепт") })
+            if (!world) ExtendedFloatingActionButton(onClick = onCreate, icon = { Icon(Icons.Filled.Add, null) }, text = { Text("Свой рецепт") })
         }
     ) { padding ->
+        if (world && worldPane != null) {
+            Box(Modifier.padding(padding)) { worldPane(toggle) }
+            return@Scaffold
+        }
         LazyColumn(
             Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            if (worldPane != null) item { toggle() }
             item {
                 OutlinedTextField(
                     value = query,
@@ -164,7 +187,16 @@ private fun RecipeCard(recipe: Recipe, modifier: Modifier = Modifier, onClick: (
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(Modifier.clickable(onClick = onClick).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBadge(recipeCategoryIcon(recipe.category), recipeCategoryColor(), size = 52.dp)
+            if (recipe.imageUrl != null) {
+                AsyncImage(
+                    model = "${recipe.imageUrl}/preview",
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(56.dp).clip(MaterialTheme.shapes.small)
+                )
+            } else {
+                IconBadge(recipeCategoryIcon(recipe.category), recipeCategoryColor(), size = 52.dp)
+            }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(recipe.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)

@@ -20,7 +20,11 @@ data class Recipe(
     val fatPerServing: Double,
     val carbsPerServing: Double,
     /** Weight of the finished dish (water boils off or is absorbed); null = sum of raw ingredients. */
-    val cookedWeight: Double? = null
+    val cookedWeight: Double? = null,
+    /** Photo URL (recipes imported from TheMealDB). */
+    val imageUrl: String? = null,
+    /** Where the recipe came from, e.g. "TheMealDB:52834", to avoid duplicate imports. */
+    val externalId: String? = null
 ) {
     val totalCalories get() = caloriesPerServing * servings
     val totalProtein get() = proteinPerServing * servings

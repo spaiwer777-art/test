@@ -77,4 +77,16 @@ class LogicTest {
         )
         assertEquals(2000.0, scaleDay(day, 2000.0).calories, 0.01)
     }
+
+    private fun search(q: String) = FoodSearch.rank(q, FoodSearch.stems(q), base).map { it.name }
+
+    @Test fun searchIgnoresWordOrderEndingsAndYo() {
+        assertEquals("Огурцы маринованные", search("маринованные огурцы").first())
+        assertEquals("Огурцы маринованные", search("огурец маринованный").first())
+        assertTrue(search("свекла").any { it.startsWith("Свёкла") })
+        assertEquals("Майонез 67%", search("майонез").first())
+        assertTrue(search("сыр").first().startsWith("Сыр"))
+        assertTrue(search("фарш свино говяжий").contains("Фарш свино-говяжий"))
+        assertTrue(search("огурцы соленые").isNotEmpty())
+    }
 }

@@ -12,6 +12,7 @@ import com.example.calorietracker.network.ResponseFormat
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import retrofit2.HttpException
 import kotlin.math.roundToInt
 
@@ -23,8 +24,19 @@ private val NON_CHAT_MODEL_MARKERS = listOf("whisper", "guard", "orpheus", "tts"
 
 class FoodRepository(private val db: AppDatabase) {
     fun allFoods(sources: List<FoodSource> = FoodSource.entries): Flow<List<Food>> = db.foodDao().getAll(sources)
-    fun searchFoods(query: String, sources: List<FoodSource> = FoodSource.entries): Flow<List<Food>> =
-        db.foodDao().search(query.trim().lowercase(), sources)
+    /**
+     * Word-based search: every word of the query must start a word of the name,
+     * in any order and ignoring endings and ё ("маринованные огурцы" finds
+     * "Огурцы маринованные", "свекла" finds "Свёкла").
+     */
+    fun searchFoods(query: String, sources: List<FoodSource> = FoodSource.entries): Flow<List<Food>> {
+        val stems = FoodSearch.stems(query)
+        if (stems.isEmpty()) return allFoods(sources)
+        return db.foodDao().changes().map {
+            val pattern = FoodSearch.likePattern(stems.maxBy { it.length })
+            FoodSearch.rank(query, stems, db.foodDao().candidates(pattern, sources)).take(150)
+        }
+    }
     fun observe(id: Long): Flow<Food?> = db.foodDao().observe(id)
 
     suspend fun get(id: Long): Food? = db.foodDao().get(id)
@@ -138,6 +150,44 @@ class AiRepository(private val foodRepo: FoodRepository) {
         }
         if (items.isEmpty()) throw IllegalStateException("empty estimate")
         return AiMealEstimate(parsed.name?.takeIf { it.isNotBlank() } ?: description, items)
+    }
+
+    /**
+     * Translates a TheMealDB recipe to Russian, converts measures to grams and
+     * estimates per-100g values; reference-base matches replace the estimates.
+     */
+    suspend fun translateRecipe(
+        meal: com.example.calorietracker.network.MealDetails, apiKey: String, categories: List<String>
+    ): Pair<com.example.calorietracker.data.json.AiRecipeJson, List<AiIngredient>> {
+        val system = """
+            Ты — кулинарный редактор и нутрициолог. Переведи рецепт на русский язык.
+            Название — по-русски, как блюдо принято называть в России (Beef Stroganoff → Бефстроганов, Blini → Блины).
+            Переведи меры в граммы (1 cup муки ≈ 125 г, 1 cup жидкости ≈ 240 г, 1 tbsp ≈ 15 г, 1 tsp ≈ 5 г, 1 lb ≈ 454 г, 1 oz ≈ 28 г; для штук — типичная масса).
+            Для каждого ингредиента дай пищевую ценность на 100 г по справочникам, называй продукты по-русски и указывай состояние (сырой, варёный, сухой).
+            Шаги приготовления — коротко, по-русски, без лишней воды. Оцени число порций и время в минутах.
+            Категория — одна из: ${categories.joinToString(", ")}.
+            Ответь СТРОГО JSON:
+            {"name":"название","servings":число,"minutes":число,"category":"...","steps":["шаг"],"items":[{"name":"ингредиент","grams":число,"kcal100":число,"protein100":число,"fat100":число,"carbs100":число}]}
+        """.trimIndent()
+        val user = buildString {
+            appendLine("Название: ${meal.name}")
+            appendLine("Ингредиенты:")
+            meal.ingredients.forEach { appendLine("- ${it.name}: ${it.measure}") }
+            appendLine("Приготовление:")
+            append(meal.instructions.take(4000))
+        }
+        val raw = chat(apiKey, system, user, reasoning = "low", maxTokens = 6000)
+        val parsed = gson.fromJson(extractJson(raw), com.example.calorietracker.data.json.AiRecipeJson::class.java)
+        val base = foodRepo.builtinFoods()
+        val items = parsed.items.orEmpty().mapNotNull { item ->
+            val name = item.name?.trim().orEmpty().ifEmpty { return@mapNotNull null }
+            val grams = item.grams?.takeIf { it > 0 } ?: return@mapNotNull null
+            val match = FoodMatcher.match(name, base)
+            if (match != null) AiIngredient(name, grams, match.caloriesPer100g, match.proteinPer100g, match.fatPer100g, match.carbsPer100g, match.name)
+            else AiIngredient(name, grams, item.kcal100 ?: 0.0, item.protein100 ?: 0.0, item.fat100 ?: 0.0, item.carbs100 ?: 0.0)
+        }
+        if (items.isEmpty()) throw IllegalStateException("empty recipe")
+        return parsed to items
     }
 
     /** AI meal plan for [days] days; each day is scaled to land on the calorie goal. */
@@ -285,6 +335,19 @@ class RecipeRepository(private val db: AppDatabase) {
     }
 
     suspend fun ingredientsOnce(): List<RecipeIngredient> = db.recipeDao().allIngredients()
+
+    /** Saves an imported recipe (e.g. from TheMealDB) with its photo; re-importing replaces the old copy. */
+    suspend fun saveImported(
+        name: String, category: String, servings: Int, minutes: Int, steps: String,
+        items: List<RecipeIngredient>, imageUrl: String?, externalId: String
+    ): Long {
+        db.recipeDao().findByExternal(externalId)?.let { db.recipeDao().delete(it.id) }
+        val recipe = buildRecipe(name, category, servings, minutes, steps, isBuiltin = false, ingredients = items)
+            .copy(imageUrl = imageUrl, externalId = externalId)
+        return db.recipeDao().insertWithIngredients(recipe, items)
+    }
+
+    suspend fun findByExternal(externalId: String): Recipe? = db.recipeDao().findByExternal(externalId)
 
     suspend fun delete(id: Long) = db.recipeDao().delete(id)
 }

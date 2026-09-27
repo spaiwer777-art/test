@@ -149,6 +149,17 @@ class ScreenshotTest {
         OnboardingContent(Profile(), {}, sampleDiets, 0, {}, 2350.0, {}, {}, {}, initialStep = 2)
     }
 
+    @Test fun worldRecipes() = themed(dark = false) {
+        WorldRecipesGrid(
+            com.example.calorietracker.viewmodel.WorldListState.Loaded(
+                listOf("Бефстроганов", "Блины", "Щи", "Уха", "Пельмени", "Сырники").mapIndexed { i, n ->
+                    com.example.calorietracker.network.MealSummary("$i", n, null)
+                }
+            ),
+            "a:Russian", "", {}, {}, {}, {}, header = {}
+        )
+    }
+
     @Test fun foodDetails() = themed(dark = false, tall = true) {
         FoodDetailsContent(mayo, 2100.0, MealType.LUNCH, onAdd = { _, _ -> }, onDelete = {}, onBack = {})
     }

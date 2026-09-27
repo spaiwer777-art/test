@@ -144,6 +144,15 @@ internal fun RecipeDetailsContent(
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            recipe.imageUrl?.let { url ->
+                coil.compose.AsyncImage(
+                    model = url,
+                    contentDescription = recipe.name,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().height(220.dp).clip(MaterialTheme.shapes.large)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            }
             SectionCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconBadge(recipeCategoryIcon(recipe.category), recipeCategoryColor(), 56.dp)
