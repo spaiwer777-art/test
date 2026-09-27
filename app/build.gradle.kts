@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -18,6 +20,15 @@ android {
         val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toInt() ?: 1
         versionCode = buildNumber
         versionName = "1.0.$buildNumber"
+
+        // Supabase project for accounts and cloud backup (public URL and anon key,
+        // protected by row-level security). From supabase.properties or env; empty = cloud off.
+        val supabase = Properties().apply {
+            rootProject.file("supabase.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+        }
+        fun cfg(key: String, env: String) = (supabase.getProperty(key) ?: System.getenv(env) ?: "").trim()
+        buildConfigField("String", "SUPABASE_URL", "\"${cfg("url", "SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${cfg("anonKey", "SUPABASE_ANON_KEY")}\"")
     }
 
     signingConfigs {
@@ -57,6 +68,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
@@ -71,6 +83,7 @@ android {
 dependencies {
     // Core / Compose
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation(platform("androidx.compose:compose-bom:2024.09.03"))

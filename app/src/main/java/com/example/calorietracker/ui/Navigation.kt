@@ -49,7 +49,12 @@ object Routes {
     const val AI_ADD = "ai_add/{day}/{meal}?text={text}"
     const val FOOD = "food/{foodId}/{day}/{meal}"
     const val RECIPE = "recipe/{recipeId}/{day}/{meal}"
-    const val RECIPE_EDIT = "recipe_edit"
+    const val RECIPE_EDIT = "recipe_edit?recipeId={recipeId}"
+    const val DIETS = "diets"
+    const val DIET = "diet/{dietId}"
+    const val DIET_EDIT = "diet_edit?dietId={dietId}"
+    const val ACCOUNT = "account"
+    const val ONBOARDING = "onboarding"
 
     fun addFood(day: Long, meal: MealType) = "add_food/$day/${meal.name}"
     fun scan(day: Long, meal: MealType) = "scan/$day/${meal.name}"
@@ -57,6 +62,9 @@ object Routes {
     fun food(id: Long, day: Long, meal: MealType) = "food/$id/$day/${meal.name}"
     fun recipe(id: Long, day: Long, meal: MealType) = "recipe/$id/$day/${meal.name}"
     fun calculator(type: CalcType) = "calc/${type.name}"
+    fun recipeEdit(id: Long = 0) = "recipe_edit?recipeId=$id"
+    fun diet(id: Long) = "diet/$id"
+    fun dietEdit(id: Long = 0) = "diet_edit?dietId=$id"
 }
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector)
@@ -102,7 +110,7 @@ internal fun BottomTabs(currentRoute: String?, onNavigate: (String) -> Unit) {
 }
 
 @Composable
-fun AppNavHost() {
+fun AppNavHost(startOnboarding: Boolean = false) {
     val navController: NavHostController = rememberNavController()
     val bottomBar: @Composable () -> Unit = { AppBottomBar(navController) }
     val back: () -> Unit = { navController.popBackStack() }
@@ -119,7 +127,7 @@ fun AppNavHost() {
 
     NavHost(
         navController = navController,
-        startDestination = Routes.DIARY,
+        startDestination = if (startOnboarding) Routes.ONBOARDING else Routes.DIARY,
         // Tabs cross-fade; detail screens slide in from the side.
         enterTransition = { fadeIn(tween(250)) },
         exitTransition = { fadeOut(tween(200)) },
@@ -136,6 +144,15 @@ fun AppNavHost() {
             popExitTransition = { slideOutOfContainer(pop, tween(280)) + fadeOut(tween(280)) }
         ) { content(it) }
 
+        composable(Routes.ONBOARDING) {
+            OnboardingScreen(
+                onDone = { navController.navigate(Routes.DIARY) { popUpTo(Routes.ONBOARDING) { inclusive = true } } },
+                onRestore = {
+                    navController.navigate(Routes.DIARY) { popUpTo(Routes.ONBOARDING) { inclusive = true } }
+                    navController.navigate(Routes.ACCOUNT)
+                }
+            )
+        }
         composable(Routes.DIARY) {
             DiaryScreen(
                 onAddFood = { day, meal -> navController.navigate(Routes.addFood(day, meal)) },
@@ -149,7 +166,7 @@ fun AppNavHost() {
         composable(Routes.RECIPES) {
             RecipesScreen(
                 onOpen = { navController.navigate(Routes.recipe(it, today, mealForCurrentTime())) },
-                onCreate = { navController.navigate(Routes.RECIPE_EDIT) },
+                onCreate = { navController.navigate(Routes.recipeEdit()) },
                 bottomBar = bottomBar
             )
         }
@@ -157,6 +174,8 @@ fun AppNavHost() {
         composable(Routes.MORE) {
             MoreScreen(
                 onPlan = { navController.navigate(Routes.PLAN) },
+                onDiets = { navController.navigate(Routes.DIETS) },
+                onAccount = { navController.navigate(Routes.ACCOUNT) },
                 onCalculators = { navController.navigate(Routes.CALCULATORS) },
                 onSettings = { navController.navigate(Routes.SETTINGS) },
                 bottomBar = bottomBar
@@ -216,17 +235,44 @@ fun AppNavHost() {
             FoodDetailsScreen(epochDay = entry.day(), initialMeal = entry.meal(), onAdded = backToDiary, onBack = back)
         }
         detail(Routes.RECIPE, dayMealArgs + navArgument("recipeId") { type = NavType.LongType }) { entry ->
-            RecipeDetailsScreen(epochDay = entry.day(), initialMeal = entry.meal(), onAdded = backToDiary, onBack = back)
+            RecipeDetailsScreen(
+                epochDay = entry.day(), initialMeal = entry.meal(), onAdded = backToDiary,
+                onEdit = { navController.navigate(Routes.recipeEdit(it)) }, onBack = back
+            )
         }
-        detail(Routes.RECIPE_EDIT) {
+        detail(Routes.RECIPE_EDIT, listOf(navArgument("recipeId") { type = NavType.LongType; defaultValue = 0L })) { entry ->
+            val sourceId = entry.arguments?.getLong("recipeId") ?: 0L
             RecipeEditorScreen(
                 onSaved = { id ->
-                    navController.navigate(Routes.recipe(id, today, mealForCurrentTime())) {
+                    // Edited in place: the details screen underneath already shows it.
+                    if (id == sourceId) back()
+                    else navController.navigate(Routes.recipe(id, today, mealForCurrentTime())) {
                         popUpTo(Routes.RECIPE_EDIT) { inclusive = true }
                     }
                 },
                 onBack = back
             )
         }
+        detail(Routes.DIETS) {
+            DietsScreen(
+                onOpen = { navController.navigate(Routes.diet(it)) },
+                onCreate = { navController.navigate(Routes.dietEdit()) },
+                onBack = back
+            )
+        }
+        detail(Routes.DIET, listOf(navArgument("dietId") { type = NavType.LongType })) {
+            DietDetailsScreen(onEdit = { navController.navigate(Routes.dietEdit(it)) }, onBack = back)
+        }
+        detail(Routes.DIET_EDIT, listOf(navArgument("dietId") { type = NavType.LongType; defaultValue = 0L })) { entry ->
+            val sourceId = entry.arguments?.getLong("dietId") ?: 0L
+            DietEditorScreen(
+                onSaved = { id ->
+                    if (id == sourceId) back()
+                    else navController.navigate(Routes.diet(id)) { popUpTo(Routes.DIET_EDIT) { inclusive = true } }
+                },
+                onBack = back
+            )
+        }
+        detail(Routes.ACCOUNT) { AccountScreen(onBack = back) }
     }
 }

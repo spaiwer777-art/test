@@ -13,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Info
@@ -35,7 +37,14 @@ import com.example.calorietracker.ui.components.SectionCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MoreScreen(onPlan: () -> Unit, onCalculators: () -> Unit, onSettings: () -> Unit, bottomBar: @Composable () -> Unit) {
+fun MoreScreen(
+    onPlan: () -> Unit,
+    onDiets: () -> Unit,
+    onAccount: () -> Unit,
+    onCalculators: () -> Unit,
+    onSettings: () -> Unit,
+    bottomBar: @Composable () -> Unit
+) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("Ещё", style = MaterialTheme.typography.headlineSmall) }) },
         bottomBar = bottomBar
@@ -45,6 +54,8 @@ fun MoreScreen(onPlan: () -> Unit, onCalculators: () -> Unit, onSettings: () -> 
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             val accent = MaterialTheme.colorScheme.primary
+            MoreItem(Icons.Filled.CloudSync, "Аккаунт и резервная копия", "Вход, сохранение прогресса и перенос на другой телефон", onAccount)
+            MoreItem(Icons.Filled.Eco, "Диеты", "Готовые диеты и конструктор своей: БЖУ, калории, правила", onDiets)
             MoreItem(Icons.Filled.EventNote, "Рацион", "План питания на 1–7 дней: с ИИ или из рецептов", onPlan)
             MoreItem(Icons.Filled.Calculate, "Калькуляторы", "Норма калорий, ИМТ, вода, БЖУ, % жира, идеальный вес, тренировки", onCalculators)
             MoreItem(Icons.Filled.Settings, "Настройки", "Тема, цвета, цель, ключ Groq", onSettings)

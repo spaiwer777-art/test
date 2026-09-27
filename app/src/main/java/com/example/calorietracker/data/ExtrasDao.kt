@@ -38,6 +38,26 @@ interface RecipeDao {
         return id
     }
 
+    @Query("SELECT * FROM recipe_ingredients")
+    suspend fun allIngredients(): List<RecipeIngredient>
+
+    @Query("SELECT id, name FROM recipes WHERE isBuiltin = 1")
+    suspend fun builtinNames(): List<IdName>
+
+    @Query("UPDATE diary_entries SET recipeId = :newId WHERE recipeId = :oldId")
+    suspend fun remapDiaryRecipe(oldId: Long, newId: Long?)
+
+    @androidx.room.Update
+    suspend fun update(recipe: Recipe)
+
+    /** Replaces a user recipe's row and ingredient lines in one go. */
+    @Transaction
+    suspend fun replace(recipe: Recipe, items: List<RecipeIngredient>) {
+        update(recipe)
+        deleteIngredients(recipe.id)
+        insertIngredients(items.map { it.copy(id = 0, recipeId = recipe.id) })
+    }
+
     @Query("DELETE FROM recipe_ingredients WHERE recipeId = :recipeId")
     suspend fun deleteIngredients(recipeId: Long)
 
@@ -77,6 +97,8 @@ interface TrackingDao {
     @Upsert
     suspend fun upsertWeight(entry: WeightEntry)
 
+    suspend fun setWeightFor(epochDay: Long, kg: Double) = upsertWeight(WeightEntry(epochDay, kg))
+
     @Query("SELECT * FROM water_entries WHERE epochDay = :epochDay")
     fun water(epochDay: Long): Flow<WaterEntry?>
 
@@ -94,3 +116,24 @@ interface TrackingDao {
 }
 
 data class RecipeGrams(val recipeId: Long, val grams: Double)
+
+@Dao
+interface DietDao {
+    @Query("SELECT * FROM diets ORDER BY isBuiltin DESC, id")
+    fun all(): Flow<List<Diet>>
+
+    @Query("SELECT * FROM diets WHERE id = :id")
+    fun observe(id: Long): Flow<Diet?>
+
+    @Query("SELECT * FROM diets WHERE id = :id")
+    suspend fun get(id: Long): Diet?
+
+    @Upsert
+    suspend fun upsert(diet: Diet): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(diets: List<Diet>)
+
+    @Query("DELETE FROM diets WHERE id = :id AND isBuiltin = 0")
+    suspend fun delete(id: Long)
+}

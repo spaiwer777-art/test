@@ -39,6 +39,14 @@ import com.example.calorietracker.ui.theme.isDarkSurface
 import java.io.File
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -147,6 +155,7 @@ fun DiaryScreen(
         waterGoalMl = waterGoal,
         onShiftDay = viewModel::shiftDay,
         onToday = viewModel::goToToday,
+        onSelectDay = viewModel::selectDay,
         onDelete = viewModel::deleteEntry,
         onSetWater = viewModel::setWater,
         onRequestPhoto = requestPhoto,
@@ -170,6 +179,7 @@ internal fun DiaryContent(
     waterGoalMl: Int,
     onShiftDay: (Long) -> Unit,
     onToday: () -> Unit,
+    onSelectDay: (Long) -> Unit,
     onDelete: (Long) -> Unit,
     onSetWater: (Int) -> Unit,
     onRequestPhoto: (MealType, fromCamera: Boolean) -> Unit,
@@ -186,7 +196,19 @@ internal fun DiaryContent(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Дневник", style = MaterialTheme.typography.headlineSmall) })
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(greeting(), style = MaterialTheme.typography.headlineSmall)
+                        Text(
+                            state.dietName?.let { "Диета: $it" } ?: "Цель ${state.dailyGoal.roundToInt()} ккал",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                actions = { if (state.streak > 0) StreakChip(state.streak) }
+            )
         },
         bottomBar = bottomBar,
         floatingActionButton = {
@@ -203,10 +225,12 @@ internal fun DiaryContent(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                DaySwitcher(
-                    epochDay = selectedDay,
-                    onPrev = { onShiftDay(-1) },
-                    onNext = { onShiftDay(1) },
+                WeekStrip(
+                    week = state.week,
+                    selectedDay = selectedDay,
+                    goal = state.dailyGoal,
+                    onSelect = onSelectDay,
+                    onShiftWeek = { onShiftDay(it * 7L) },
                     onToday = onToday
                 )
             }
@@ -254,32 +278,98 @@ private fun dayLabel(epochDay: Long): String {
     }
 }
 
+private fun greeting(): String = when (java.time.LocalTime.now().hour) {
+    in 5..11 -> "Доброе утро"
+    in 12..17 -> "Добрый день"
+    in 18..22 -> "Добрый вечер"
+    else -> "Доброй ночи"
+}
+
 @Composable
-private fun DaySwitcher(epochDay: Long, onPrev: () -> Unit, onNext: () -> Unit, onToday: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onPrev) { Icon(Icons.Filled.ChevronLeft, contentDescription = "Предыдущий день") }
-        AnimatedContent(
-            targetState = epochDay,
-            transitionSpec = {
-                val dir = if (targetState > initialState) 1 else -1
-                (slideInHorizontally { it / 2 * dir } + fadeIn()) togetherWith
-                    (slideOutHorizontally { -it / 2 * dir } + fadeOut())
-            },
-            modifier = Modifier.weight(1f),
-            label = "day"
-        ) { day ->
-            Text(
-                dayLabel(day),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.small)
-                    .clickable(onClick = onToday)
-                    .padding(vertical = 8.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
+private fun StreakChip(days: Int) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier.padding(end = 12.dp)
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.LocalFireDepartment, null, tint = Color(0xFFEB6834), modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("$days", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
-        IconButton(onClick = onNext) { Icon(Icons.Filled.ChevronRight, contentDescription = "Следующий день") }
+    }
+}
+
+private val monthFormatter = DateTimeFormatter.ofPattern("LLLL yyyy", Locale("ru"))
+private val weekdayShort = DateTimeFormatter.ofPattern("EEE", Locale("ru"))
+
+/**
+ * Monday-to-Sunday strip; each day shows a mini ring of calories against the
+ * goal, the selected day is filled, today has a dot. Arrows move a week.
+ */
+@Composable
+private fun WeekStrip(
+    week: List<com.example.calorietracker.data.DayTotals>,
+    selectedDay: Long,
+    goal: Double,
+    onSelect: (Long) -> Unit,
+    onShiftWeek: (Int) -> Unit,
+    onToday: () -> Unit
+) {
+    val today = LocalDate.now().toEpochDay()
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AnimatedContent(LocalDate.ofEpochDay(selectedDay).format(monthFormatter).replaceFirstChar { it.uppercase() }, label = "month") {
+                Text(it, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 4.dp))
+            }
+            Spacer(Modifier.weight(1f))
+            if (selectedDay != today) TextButton(onClick = onToday) { Text("Сегодня") }
+            IconButton(onClick = { onShiftWeek(-1) }) { Icon(Icons.Filled.ChevronLeft, "Предыдущая неделя") }
+            IconButton(onClick = { onShiftWeek(1) }) { Icon(Icons.Filled.ChevronRight, "Следующая неделя") }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            week.forEach { d ->
+                DayCell(
+                    date = LocalDate.ofEpochDay(d.epochDay),
+                    progress = if (goal > 0) (d.calories / goal).toFloat() else 0f,
+                    selected = d.epochDay == selectedDay,
+                    isToday = d.epochDay == today,
+                    onClick = { onSelect(d.epochDay) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayCell(date: LocalDate, progress: Float, selected: Boolean, isToday: Boolean, onClick: () -> Unit) {
+    val bg by animateColorAsState(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, label = "daybg")
+    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val ring = if (progress > 1.05f) com.example.calorietracker.ui.theme.StatusCritical else if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+    val track = if (selected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant
+    val sweep by animateFloatAsState(progress.coerceIn(0f, 1f), label = "dayring")
+    Column(
+        Modifier.clip(RoundedCornerShape(18.dp)).background(bg).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            date.format(weekdayShort).replaceFirstChar { it.uppercase() },
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) fg else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(4.dp))
+        Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                val stroke = 3.dp.toPx()
+                val d = size.minDimension - stroke
+                val tl = Offset(stroke / 2, stroke / 2)
+                drawArc(track, 0f, 360f, false, tl, Size(d, d), style = Stroke(stroke))
+                if (sweep > 0f) drawArc(ring, -90f, 360f * sweep, false, tl, Size(d, d), style = Stroke(stroke, cap = StrokeCap.Round))
+            }
+            Text("${date.dayOfMonth}", style = MaterialTheme.typography.labelLarge, color = fg)
+        }
+        Spacer(Modifier.height(4.dp))
+        Box(Modifier.size(4.dp).clip(CircleShape).background(if (isToday) (if (selected) fg else MaterialTheme.colorScheme.primary) else Color.Transparent))
     }
 }
 
@@ -291,7 +381,10 @@ private fun SummaryCard(state: DiaryUiState) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
+        val glow = Brush.verticalGradient(
+            listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f), MaterialTheme.colorScheme.surfaceContainer)
+        )
+        Column(Modifier.background(glow).padding(horizontal = 16.dp, vertical = 20.dp)) {
             CalorieSummary(
                 caloriesByMeal = MealType.entries.associateWith { state.caloriesFor(it) },
                 goal = state.dailyGoal,

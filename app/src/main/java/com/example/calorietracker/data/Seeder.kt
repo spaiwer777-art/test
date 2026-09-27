@@ -1,6 +1,7 @@
 package com.example.calorietracker.data
 
 import android.content.Context
+import com.example.calorietracker.data.json.BuiltinDiet
 import com.example.calorietracker.data.json.BuiltinFood
 import com.example.calorietracker.data.json.BuiltinRecipe
 import com.google.gson.Gson
@@ -13,7 +14,7 @@ import kotlinx.coroutines.flow.first
  * data and diary entries (which snapshot their values) are untouched.
  */
 object Seeder {
-    private const val SEED_VERSION = 1
+    private const val SEED_VERSION = 3
 
     suspend fun run(context: Context, db: AppDatabase, settings: SettingsRepository) {
         backfillSearchNames(db)
@@ -23,13 +24,26 @@ object Seeder {
         val foods: List<BuiltinFood> = context.assets.open("foods_ru.json").reader().use {
             gson.fromJson(it, object : TypeToken<List<BuiltinFood>>() {}.type)
         }
+        val usda: List<BuiltinFood> = context.assets.open("foods_usda.json").reader().use {
+            gson.fromJson(it, object : TypeToken<List<BuiltinFood>>() {}.type)
+        }
         val recipes: List<BuiltinRecipe> = context.assets.open("recipes_ru.json").reader().use {
             gson.fromJson(it, object : TypeToken<List<BuiltinRecipe>>() {}.type)
         }
 
-        db.foodDao().deleteBuiltin()
-        db.foodDao().insertAll(foods.map { it.toFood() })
+        val diets: List<BuiltinDiet> = context.assets.open("diets_ru.json").reader().use {
+            gson.fromJson(it, object : TypeToken<List<BuiltinDiet>>() {}.type)
+        }
 
+        // Built-in rows get new ids on every reseed; remember them by name so diary
+        // entries that link to a built-in food or recipe can be pointed at the new row.
+        val oldFoods = db.foodDao().builtinNames()
+        db.foodDao().deleteBuiltin()
+        db.foodDao().insertAll(foods.map { it.toFood(FoodSource.BUILTIN) } + usda.map { it.toFood(FoodSource.USDA) })
+        val newFoods = db.foodDao().builtinNames().associate { it.name to it.id }
+        oldFoods.forEach { db.foodDao().remapDiaryFood(it.id, newFoods[it.name]) }
+
+        val oldRecipes = db.recipeDao().builtinNames()
         db.recipeDao().deleteBuiltinIngredients()
         db.recipeDao().deleteBuiltinRecipes()
         val byName = foods.associateBy { it.name }
@@ -51,6 +65,19 @@ object Seeder {
                 ingredients
             )
         }
+        val newRecipes = db.recipeDao().builtinNames().associate { it.name to it.id }
+        oldRecipes.forEach { db.recipeDao().remapDiaryRecipe(it.id, newRecipes[it.name]) }
+
+        // Built-in diets keep fixed ids (1..N) so the active diet survives reseeding;
+        // user diets are created later and get ids above them.
+        db.dietDao().insertAll(diets.map {
+            Diet(
+                id = it.id, name = it.name, description = it.description,
+                proteinPct = it.proteinPct, fatPct = it.fatPct, carbsPct = it.carbsPct,
+                calorieAdjustPct = it.calorieAdjustPct, mealsPerDay = it.mealsPerDay,
+                recommended = it.recommended, avoid = it.avoid, isBuiltin = true
+            )
+        })
         settings.setSeedVersion(SEED_VERSION)
     }
 
@@ -59,14 +86,18 @@ object Seeder {
         db.foodDao().missingSearchName().forEach { db.foodDao().setSearchName(it.id, it.name.lowercase()) }
     }
 
-    private fun BuiltinFood.toFood() = Food(
+    private fun BuiltinFood.toFood(source: FoodSource) = Food(
         name = name,
         caloriesPer100g = kcal,
         proteinPer100g = protein,
         fatPer100g = fat,
         carbsPer100g = carbs,
         category = category,
-        source = FoodSource.BUILTIN,
+        source = source,
+        fiberPer100g = fiber,
+        sugarPer100g = sugar,
+        saturatedFatPer100g = satFat,
+        saltPer100g = salt,
         servingGrams = servingGrams,
         servingLabel = servingLabel
     )

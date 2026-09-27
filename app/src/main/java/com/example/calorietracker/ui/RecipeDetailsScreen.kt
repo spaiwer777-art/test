@@ -19,6 +19,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.calorietracker.ui.components.DietWarning
+import com.example.calorietracker.ui.components.toNumberOrNull
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
@@ -61,12 +71,13 @@ import com.example.calorietracker.viewmodel.RecipeDetailsViewModel
 import kotlin.math.roundToInt
 
 @Composable
-fun RecipeDetailsScreen(epochDay: Long, initialMeal: MealType, onAdded: () -> Unit, onBack: () -> Unit) {
+fun RecipeDetailsScreen(epochDay: Long, initialMeal: MealType, onAdded: () -> Unit, onEdit: (Long) -> Unit, onBack: () -> Unit) {
     val vm: RecipeDetailsViewModel = viewModel()
     val diaryVm: DiaryViewModel = viewModel()
     val recipe by vm.recipe.collectAsState()
     val ingredients by vm.ingredients.collectAsState()
     val goal by vm.dailyGoal.collectAsState()
+    val conflict by vm.dietConflict.collectAsState()
     val r = recipe
     if (r == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -77,15 +88,18 @@ fun RecipeDetailsScreen(epochDay: Long, initialMeal: MealType, onAdded: () -> Un
         ingredients = ingredients,
         dailyGoal = goal,
         initialMeal = initialMeal,
+        dietConflict = conflict,
         onAdd = { portions, meal ->
-            val gramsPerServing = ingredients.sumOf { it.grams } / r.servings
+            // Portions are fractions of the whole dish; grams mode passes grams / dish weight.
+            val dishWeight = r.cookedWeight ?: ingredients.sumOf { it.grams }
             diaryVm.addPrecomputedEntry(
                 r.name, r.caloriesPerServing * portions, r.proteinPerServing * portions,
                 r.fatPerServing * portions, r.carbsPerServing * portions, meal, epochDay,
-                grams = (gramsPerServing * portions).roundToInt().toDouble(), recipeId = r.id
+                grams = (dishWeight / r.servings * portions).roundToInt().toDouble(), recipeId = r.id
             )
             onAdded()
         },
+        onEdit = { onEdit(r.id) },
         onDelete = if (!r.isBuiltin) ({ vm.delete(onBack) }) else null,
         onBack = onBack
     )
@@ -100,9 +114,15 @@ internal fun RecipeDetailsContent(
     initialMeal: MealType,
     onAdd: (portions: Double, meal: MealType) -> Unit,
     onDelete: (() -> Unit)?,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onEdit: () -> Unit = {},
+    dietConflict: String? = null
 ) {
     var portions by remember { mutableDoubleStateOf(1.0) }
+    var byGrams by remember { mutableStateOf(false) }
+    var gramsText by remember { mutableStateOf("") }
+    val dishWeight = recipe.cookedWeight ?: ingredients.sumOf { it.grams }
+    val servingWeight = if (recipe.servings > 0) dishWeight / recipe.servings else 0.0
     var meal by remember { mutableStateOf(initialMeal) }
     var cookServings by remember(recipe.id) { mutableIntStateOf(recipe.servings) }
 
@@ -111,7 +131,12 @@ internal fun RecipeDetailsContent(
             TopAppBar(
                 title = { Text("Рецепт") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") } },
-                actions = { if (onDelete != null) IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, "Удалить рецепт") } }
+                actions = {
+                    IconButton(onClick = onEdit) {
+                        Icon(if (recipe.isBuiltin) Icons.Filled.ContentCopy else Icons.Filled.Edit, if (recipe.isBuiltin) "Сделать свою копию" else "Изменить")
+                    }
+                    if (onDelete != null) IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, "Удалить рецепт") }
+                }
             )
         }
     ) { padding ->
@@ -143,11 +168,43 @@ internal fun RecipeDetailsContent(
                 MacroDonut(recipe.proteinPerServing, recipe.fatPerServing, recipe.carbsPerServing)
             }
 
+            if (dietConflict != null) {
+                DietWarning("Не подходит диете $dietConflict")
+            }
+
+            SectionCard(title = "Всё блюдо", subtitle = "${recipe.servings} порц. · ${dishWeight.roundToInt()} г${if (recipe.cookedWeight != null) " готового" else " (сумма продуктов)"}") {
+                Row(Modifier.fillMaxWidth()) {
+                    WholeStat("Всего", "${recipe.totalCalories.roundToInt()} ккал", Modifier.weight(1f))
+                    WholeStat("На 100 г", "${(recipe.totalCalories / dishWeight * 100).roundToInt()} ккал", Modifier.weight(1f))
+                    WholeStat("Порция", "${servingWeight.roundToInt()} г", Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Б ${recipe.totalProtein.roundToInt()} · Ж ${recipe.totalFat.roundToInt()} · У ${recipe.totalCarbs.roundToInt()} г во всём блюде",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             SectionCard(title = "Записать в дневник") {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(selected = !byGrams, onClick = { byGrams = false }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("Порции") }
+                    SegmentedButton(selected = byGrams, onClick = { byGrams = true }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Граммы") }
+                }
+                Spacer(Modifier.height(12.dp))
+                if (byGrams) {
+                    OutlinedTextField(
+                        value = gramsText,
+                        onValueChange = { gramsText = it; it.toNumberOrNull()?.let { g -> if (servingWeight > 0) portions = g / servingWeight } },
+                        label = { Text("Сколько грамм съел") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Порций", style = MaterialTheme.typography.labelLarge)
                     listOf(0.5, 1.0, 1.5, 2.0).forEach { p ->
-                        FilterChip(selected = portions == p, onClick = { portions = p }, label = { Text(formatGrams(p)) })
+                        FilterChip(selected = portions == p, onClick = { portions = p; gramsText = formatGrams(servingWeight * p) }, label = { Text(formatGrams(p)) })
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -208,5 +265,13 @@ internal fun RecipeDetailsContent(
             }
             Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+@Composable
+private fun WholeStat(label: String, value: String, modifier: Modifier) {
+    Column(modifier) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleMedium)
     }
 }

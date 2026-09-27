@@ -25,9 +25,16 @@ object PlanBuilder {
         calorieGoal: Double,
         days: Int,
         includeSnack: Boolean,
-        seed: Long = System.currentTimeMillis()
+        seed: Long = System.currentTimeMillis(),
+        diet: Diet? = null,
+        ingredients: List<RecipeIngredient> = emptyList()
     ): MealPlanData {
         val random = Random(seed)
+        val byRecipe = ingredients.groupBy { it.recipeId }
+        // With a diet, prefer recipes whose name and ingredients don't hit its "avoid" list.
+        val allowed = if (diet == null) recipes else recipes.filter { r ->
+            DietRules.fits(diet, r.name, *byRecipe[r.id].orEmpty().map { it.name }.toTypedArray())
+        }.ifEmpty { recipes }
         val slots = if (includeSnack) MealType.entries else MealType.entries - MealType.SNACK
         val shares = slots.associateWith { it.planShare }.let { m -> m.mapValues { it.value / m.values.sum() } }
         var previousDay = emptySet<Long>()
@@ -36,7 +43,8 @@ object PlanBuilder {
             val usedToday = mutableSetOf<Long>()
             val meals = slots.mapNotNull { slot ->
                 val categories = slotCategories.getValue(slot)
-                val pool = recipes.filter { it.category in categories && it.caloriesPerServing > 0 }
+                val pool = allowed.filter { it.category in categories && it.caloriesPerServing > 0 }
+                    .ifEmpty { allowed.filter { it.caloriesPerServing > 0 } }
                 val fresh = pool.filter { it.id !in usedToday && it.id !in previousDay }
                 val recipe = (fresh.ifEmpty { pool.filter { it.id !in usedToday } }.ifEmpty { pool })
                     .randomOrNull(random) ?: return@mapNotNull null
@@ -60,7 +68,7 @@ object PlanBuilder {
             previousDay = usedToday
             PlanDay(meals)
         }
-        return MealPlanData(calorieGoal, "", "Рецепты приложения", planDays)
+        return MealPlanData(calorieGoal, "", if (diet != null) "Рецепты · ${diet.name}" else "Рецепты приложения", planDays)
     }
 
     private fun formatPortions(p: Double): String {

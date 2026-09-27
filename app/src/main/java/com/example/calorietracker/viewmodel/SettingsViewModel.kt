@@ -26,6 +26,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val accent: StateFlow<AccentColor> = repo.accent
         .stateIn(viewModelScope, SharingStarted.Eagerly, AccentColor.GREEN)
 
+    val macroSplit: StateFlow<com.example.calorietracker.data.MacroSplit> = repo.macroSplit
+        .stateIn(viewModelScope, SharingStarted.Eagerly, com.example.calorietracker.data.MacroSplit.DEFAULT)
+
     val dynamicColor: StateFlow<Boolean> = repo.dynamicColor
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 

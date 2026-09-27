@@ -22,8 +22,9 @@ private val NON_CHAT_MODEL_MARKERS = listOf("whisper", "guard", "orpheus", "tts"
 @Volatile private var groqModel = PREFERRED_GROQ_MODELS.first()
 
 class FoodRepository(private val db: AppDatabase) {
-    fun allFoods(): Flow<List<Food>> = db.foodDao().getAll()
-    fun searchFoods(query: String): Flow<List<Food>> = db.foodDao().search(query.trim().lowercase())
+    fun allFoods(sources: List<FoodSource> = FoodSource.entries): Flow<List<Food>> = db.foodDao().getAll(sources)
+    fun searchFoods(query: String, sources: List<FoodSource> = FoodSource.entries): Flow<List<Food>> =
+        db.foodDao().search(query.trim().lowercase(), sources)
     fun observe(id: Long): Flow<Food?> = db.foodDao().observe(id)
 
     suspend fun get(id: Long): Food? = db.foodDao().get(id)
@@ -148,13 +149,19 @@ class AiRepository(private val foodRepo: FoodRepository) {
         carbs: Double,
         days: Int,
         includeSnack: Boolean,
-        preferences: String
+        preferences: String,
+        diet: Diet? = null
     ): MealPlanData {
         val meals = if (includeSnack) "BREAKFAST, LUNCH, DINNER, SNACK" else "BREAKFAST, LUNCH, DINNER"
+        val dietText = diet?.let {
+            val avoid = DietRules.keywords(it).map { k -> k.removeSuffix("=") }
+            "\nДиета: «${it.name}». ${it.description}\nПравила: ${it.recommended.replace("\n", "; ")}" +
+                (if (avoid.isNotEmpty()) "\nНе используй продукты, в названии которых есть: ${avoid.joinToString(", ")}." else "")
+        }.orEmpty()
         val system = """
             Ты — диетолог. Составь рацион питания на $days дн.
             Цель на день: ${calorieGoal.roundToInt()} ккал (допуск ±5%), белки ≈ ${protein.roundToInt()} г, жиры ≈ ${fat.roundToInt()} г, углеводы ≈ ${carbs.roundToInt()} г.
-            Приёмы пищи каждый день: $meals.
+            Приёмы пищи каждый день: $meals.$dietText
             Блюда — простая домашняя кухня из продуктов обычного российского супермаркета; не повторяй блюдо чаще раза в 2 дня.
             Для каждого приёма: название блюда, масса порции в граммах, КБЖУ порции и короткий состав с граммовками.
             Ответь СТРОГО JSON:
@@ -169,7 +176,10 @@ class AiRepository(private val foodRepo: FoodRepository) {
                 .filter { it.kcal > 0 && MealType.entries.any { m -> m.name == it.meal } })
         }.orEmpty().filter { it.meals.isNotEmpty() }
         if (parsedDays.isEmpty()) throw IllegalStateException("empty plan")
-        return MealPlanData(calorieGoal, preferences, "ИИ", parsedDays.map { scaleDay(it, calorieGoal) })
+        return MealPlanData(
+            calorieGoal, preferences, if (diet != null) "ИИ · ${diet.name}" else "ИИ",
+            parsedDays.map { scaleDay(it, calorieGoal) }
+        )
     }
 
     private suspend fun chat(apiKey: String, system: String, user: String, reasoning: String, maxTokens: Int): String {
@@ -238,6 +248,17 @@ class DiaryRepository(private val db: AppDatabase) {
     suspend fun deleteEntry(id: Long) = db.diaryDao().delete(id)
 }
 
+class DietRepository(private val db: AppDatabase) {
+    fun all(): Flow<List<Diet>> = db.dietDao().all()
+    fun observe(id: Long): Flow<Diet?> = db.dietDao().observe(id)
+    suspend fun get(id: Long): Diet? = db.dietDao().get(id)
+    suspend fun save(diet: Diet): Long {
+        val id = db.dietDao().upsert(diet)
+        return if (diet.id != 0L) diet.id else id
+    }
+    suspend fun delete(id: Long) = db.dietDao().delete(id)
+}
+
 class RecipeRepository(private val db: AppDatabase) {
     fun all(): Flow<List<Recipe>> = db.recipeDao().all()
     fun observe(id: Long): Flow<Recipe?> = db.recipeDao().observe(id)
@@ -246,11 +267,24 @@ class RecipeRepository(private val db: AppDatabase) {
     suspend fun totalGrams(): Map<Long, Double> = db.recipeDao().totalGrams().associate { it.recipeId to it.grams }
 
     suspend fun save(
-        name: String, category: String, servings: Int, minutes: Int, steps: String, items: List<RecipeIngredient>
+        name: String, category: String, servings: Int, minutes: Int, steps: String, items: List<RecipeIngredient>,
+        cookedWeight: Double? = null
     ): Long {
         val recipe = buildRecipe(name, category, servings, minutes, steps, isBuiltin = false, ingredients = items)
+            .copy(cookedWeight = cookedWeight)
         return db.recipeDao().insertWithIngredients(recipe, items)
     }
+
+    suspend fun update(
+        id: Long, name: String, category: String, servings: Int, minutes: Int, steps: String,
+        cookedWeight: Double?, items: List<RecipeIngredient>
+    ) {
+        val recipe = buildRecipe(name, category, servings, minutes, steps, isBuiltin = false, ingredients = items, id = id)
+            .copy(cookedWeight = cookedWeight)
+        db.recipeDao().replace(recipe, items)
+    }
+
+    suspend fun ingredientsOnce(): List<RecipeIngredient> = db.recipeDao().allIngredients()
 
     suspend fun delete(id: Long) = db.recipeDao().delete(id)
 }

@@ -27,9 +27,9 @@ class Converters {
 @Database(
     entities = [
         Food::class, DiaryEntry::class, Recipe::class, RecipeIngredient::class,
-        MealPhoto::class, WeightEntry::class, WaterEntry::class, MealPlanEntity::class
+        MealPhoto::class, WeightEntry::class, WaterEntry::class, MealPlanEntity::class, Diet::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -38,6 +38,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun diaryDao(): DiaryDao
     abstract fun recipeDao(): RecipeDao
     abstract fun trackingDao(): TrackingDao
+    abstract fun dietDao(): DietDao
+    abstract fun backupDao(): BackupDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -48,7 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "calorie_tracker.db"
-                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
     }
 }
@@ -57,5 +59,12 @@ abstract class AppDatabase : RoomDatabase() {
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         MIGRATION_1_2_SQL.forEach(db::execSQL)
+    }
+}
+
+/** v2 -> v3: diets and cooked weight for recipes. */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        MIGRATION_2_3_SQL.forEach(db::execSQL)
     }
 }

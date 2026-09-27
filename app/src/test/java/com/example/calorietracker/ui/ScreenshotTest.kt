@@ -4,6 +4,7 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.android.resources.NightMode
 import com.example.calorietracker.data.AccentColor
+import com.example.calorietracker.data.Diet
 import com.example.calorietracker.data.ActivityLevel
 import com.example.calorietracker.data.Food
 import com.example.calorietracker.data.FoodSource
@@ -44,6 +45,11 @@ class ScreenshotTest {
     private val sampleDiary = DiaryUiState(
         epochDay = today,
         dailyGoal = 2100.0,
+        dietName = "Средиземноморская",
+        streak = 12,
+        week = LocalDate.ofEpochDay(today).with(java.time.DayOfWeek.MONDAY).toEpochDay().let { mon ->
+            listOf(1980.0, 2240.0, 1850.0, 2050.0, 1278.0, 0.0, 0.0).mapIndexed { i, k -> DayTotals(mon + i, if (mon + i <= today) k else 0.0, 0.0, 0.0, 0.0) }
+        },
         entries = listOf(
             DiaryEntry(1, "Овсянка с бананом", 250.0, 310.0, 9.0, 6.0, 55.0, MealType.BREAKFAST, today),
             DiaryEntry(2, "Капучино", 200.0, 110.0, 6.0, 5.0, 9.0, MealType.BREAKFAST, today),
@@ -78,6 +84,14 @@ class ScreenshotTest {
         water = (0..29).map { WaterEntry(today - it, 1500 + (it % 5) * 250) },
         waterGoal = 2450,
         streak = 12
+    )
+
+    private val sampleDiets = listOf(
+        Diet(1, "Сбалансированная", "Классическое питание по рекомендациям ВОЗ: всего понемногу, упор на овощи, цельные крупы и белок.", 20, 30, 50, 0, 4, "Овощи и фрукты — не меньше 400 г в день", "", true),
+        Diet(2, "Мягкое похудение", "Дефицит 15% от нормы, больше белка и клетчатки, чтобы не чувствовать голод. Без жёстких запретов.", 30, 30, 40, -15, 4, "Половина тарелки — овощи\nБелок в каждом приёме пищи\nПей 30 мл воды на кг веса", "сахар=,кола,лимонад,торт,пирожн,чипс", true),
+        Diet(5, "Кето", "Очень мало углеводов (~5%), много жиров.", 20, 75, 5, -10, 3, "", "хлеб,рис", true),
+        Diet(6, "Средиземноморская", "Оливковое масло, рыба, овощи, бобовые и цельные злаки.", 18, 35, 47, 0, 4, "", "", true),
+        Diet(12, "Моя сушка", "Белок побольше, углеводы поменьше.", 35, 30, 35, -20, 5, "", "", false)
     )
 
     private val mayo = Food(
@@ -119,6 +133,22 @@ class ScreenshotTest {
         )
     )
 
+    @Test fun dietsList() = themed(dark = false) {
+        DietsContent(sampleDiets, activeId = 6, onOpen = {}, onCreate = {}, onBack = {})
+    }
+
+    @Test fun dietDetails() = themed(dark = false, tall = true) {
+        DietDetailsContent(sampleDiets[1], active = false, profile = Profile(Sex.FEMALE, 29, 168.0, 70.0, ActivityLevel.LIGHT), onStart = {}, onStop = {}, onEdit = {}, onDelete = null, onBack = {})
+    }
+
+    @Test fun onboardingWelcome() = themed(dark = false) {
+        OnboardingContent(Profile(), {}, sampleDiets, 0, {}, 2100.0, {}, {}, {})
+    }
+
+    @Test fun onboardingGoalDark() = themed(dark = true) {
+        OnboardingContent(Profile(), {}, sampleDiets, 0, {}, 2350.0, {}, {}, {}, initialStep = 2)
+    }
+
     @Test fun foodDetails() = themed(dark = false, tall = true) {
         FoodDetailsContent(mayo, 2100.0, MealType.LUNCH, onAdd = { _, _ -> }, onDelete = {}, onBack = {})
     }
@@ -132,7 +162,7 @@ class ScreenshotTest {
     }
 
     @Test fun planScreen() = themed(dark = false, tall = true) {
-        PlanContent(plan, PlanGenState.Idle, 2100.0, { _, _, _ -> }, { _, _ -> }, {}, {}, {}, {})
+        PlanContent(plan, PlanGenState.Idle, 2100.0, "Средиземноморская", { _, _, _ -> }, { _, _ -> }, {}, {}, {}, {})
     }
 
     @Test fun calculatorCalories() = themed(dark = false, tall = true) {
@@ -171,7 +201,7 @@ class ScreenshotTest {
     private fun diary(dark: Boolean, accent: AccentColor = AccentColor.GREEN, tall: Boolean = false) = themed(dark, accent, tall) {
         DiaryContent(
             state = sampleDiary, selectedDay = today, photos = emptyList(), waterMl = 1250, waterGoalMl = 2450,
-            onShiftDay = {}, onToday = {}, onDelete = {}, onSetWater = {}, onRequestPhoto = { _, _ -> }, onDeletePhoto = {},
+            onShiftDay = {}, onToday = {}, onSelectDay = {}, onDelete = {}, onSetWater = {}, onRequestPhoto = { _, _ -> }, onDeletePhoto = {},
             onAddFood = { _, _ -> }, onScanBarcode = { _, _ -> }, onAiQuickAdd = { _, _ -> },
             onOpenFood = { _, _, _ -> }, onOpenRecipe = { _, _, _ -> },
             bottomBar = { BottomTabs(Routes.DIARY) {} }
@@ -189,3 +219,4 @@ class ScreenshotTest {
     @Test fun statsLight() = stats(dark = false)
     @Test fun statsDark() = stats(dark = true)
 }
+

@@ -59,6 +59,10 @@ import com.example.calorietracker.data.Food
 import com.example.calorietracker.data.FoodSource
 import com.example.calorietracker.ui.components.toNumberOrNull
 import com.example.calorietracker.viewmodel.OnlineState
+import com.example.calorietracker.viewmodel.SearchFilter
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilterChip
 import com.example.calorietracker.viewmodel.SearchViewModel
 import kotlin.math.roundToInt
 
@@ -74,10 +78,12 @@ fun AddFoodScreen(
     val query by vm.query.collectAsState()
     val results by vm.results.collectAsState()
     val online by vm.online.collectAsState()
+    val filter by vm.filter.collectAsState()
     var showManualDialog by remember { mutableStateOf(false) }
 
-    val mine = results.filter { it.source != FoodSource.BUILTIN }
-    val base = results.filter { it.source == FoodSource.BUILTIN }
+    val mine = results.filter { !it.source.isReference }
+    val ru = results.filter { it.source == FoodSource.BUILTIN }
+    val usda = results.filter { it.source == FoodSource.USDA }
 
     Scaffold(
         topBar = {
@@ -119,17 +125,28 @@ fun AddFoodScreen(
                     AssistChip(onClick = { showManualDialog = true }, label = { Text("Вручную") }, leadingIcon = { Icon(Icons.Filled.Add, null) })
                 }
             }
-
-            if (mine.isNotEmpty()) {
-                item { SectionHeader(if (query.isBlank()) "Мои продукты" else "Мои продукты · ${mine.size}") }
-                items(mine, key = { "m${it.id}" }) { food -> FoodRow(food, Modifier.animateItem()) { onOpenFood(food.id) } }
-            }
-            if (base.isNotEmpty()) {
-                item { SectionHeader(if (query.isBlank()) "Справочная база" else "Справочная база · ${base.size}") }
-                items(base, key = { "b${it.id}" }) { food -> FoodRow(food, Modifier.animateItem()) { onOpenFood(food.id) } }
+            item {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SearchFilter.entries.forEach { f ->
+                        FilterChip(selected = filter == f, onClick = { vm.setFilter(f) }, label = { Text(f.label) })
+                    }
+                }
             }
 
-            if (query.trim().length >= 2) {
+            fun section(title: String, list: List<Food>, key: String) {
+                if (list.isEmpty()) return
+                item(key = "h$key") { SectionHeader(if (query.isBlank()) title else "$title · ${list.size}") }
+                items(list, key = { "$key${it.id}" }) { food -> FoodRow(food, Modifier.animateItem()) { onOpenFood(food.id) } }
+            }
+            section("Мои продукты", mine, "m")
+            section("Справочник РФ", ru, "r")
+            section("USDA — база Минсельхоза США (перевод)", usda, "u")
+
+            if (filter.sources.isNotEmpty() && results.isEmpty() && query.isNotBlank()) {
+                item { Text("В офлайн-базах ничего не нашлось.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp)) }
+            }
+
+            if (filter.online && query.trim().length >= 2) {
                 item { SectionHeader("Магазинные продукты · Open Food Facts") }
                 item {
                     AnimatedContent(online, transitionSpec = { fadeIn() togetherWith fadeOut() }, contentKey = { it::class }, label = "online") { s ->

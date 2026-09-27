@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -214,5 +215,17 @@ fun ThinBar(progress: Float, color: Color, modifier: Modifier = Modifier, height
             Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).fillMaxSize()
                 .clip(RoundedCornerShape(height / 2)).background(color)
         )
+    }
+}
+
+/** Warning banner for a food or recipe that conflicts with the active diet; icon + text, not color alone. */
+@Composable
+fun DietWarning(text: String) {
+    Surface(shape = MaterialTheme.shapes.medium, color = Color(0xFFFAB219).copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(androidx.compose.material.icons.Icons.Filled.Warning, null, tint = Color(0xFFB57F00))
+            Spacer(Modifier.width(10.dp))
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }

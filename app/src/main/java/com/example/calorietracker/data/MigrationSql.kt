@@ -30,3 +30,9 @@ internal val MIGRATION_1_2_SQL = listOf(
     "CREATE TABLE IF NOT EXISTS `water_entries` (`epochDay` INTEGER NOT NULL, `ml` INTEGER NOT NULL, PRIMARY KEY(`epochDay`))",
     "CREATE TABLE IF NOT EXISTS `meal_plans` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `createdAt` INTEGER NOT NULL, `title` TEXT NOT NULL, `json` TEXT NOT NULL)",
 )
+
+/** Statements for MIGRATION_2_3, derived from the exported schema 3.json. */
+internal val MIGRATION_2_3_SQL = listOf(
+    "ALTER TABLE `recipes` ADD COLUMN `cookedWeight` REAL",
+    "CREATE TABLE IF NOT EXISTS `diets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `proteinPct` INTEGER NOT NULL, `fatPct` INTEGER NOT NULL, `carbsPct` INTEGER NOT NULL, `calorieAdjustPct` INTEGER NOT NULL, `mealsPerDay` INTEGER NOT NULL, `recommended` TEXT NOT NULL, `avoid` TEXT NOT NULL, `isBuiltin` INTEGER NOT NULL)",
+)

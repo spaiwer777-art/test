@@ -65,12 +65,13 @@ fun RecipeEditorScreen(onSaved: (Long) -> Unit, onBack: () -> Unit) {
     val minutes by vm.minutes.collectAsState()
     val steps by vm.steps.collectAsState()
     val ingredients by vm.ingredients.collectAsState()
+    val cookedWeight by vm.cookedWeight.collectAsState()
     var picking by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Новый рецепт") },
+                title = { Text(if (vm.isEditing) "Изменить рецепт" else "Новый рецепт") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") } }
             )
         }
@@ -89,8 +90,8 @@ fun RecipeEditorScreen(onSaved: (Long) -> Unit, onBack: () -> Unit) {
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    NumberField("Порций", servings.toString(), Modifier.weight(1f)) { v -> v.toNumberOrNull()?.let { vm.servings.value = it.roundToInt().coerceIn(1, 50) } }
-                    NumberField("Минут", minutes.toString(), Modifier.weight(1f)) { v -> v.toNumberOrNull()?.let { vm.minutes.value = it.roundToInt().coerceIn(0, 1440) } }
+                    NumberField("Порций", servings.toString(), Modifier.weight(1f), key = servings) { v -> v.toNumberOrNull()?.let { vm.servings.value = it.roundToInt().coerceIn(1, 50) } }
+                    NumberField("Минут", minutes.toString(), Modifier.weight(1f), key = minutes) { v -> v.toNumberOrNull()?.let { vm.minutes.value = it.roundToInt().coerceIn(0, 1440) } }
                 }
             }
 
@@ -129,6 +130,10 @@ fun RecipeEditorScreen(onSaved: (Long) -> Unit, onBack: () -> Unit) {
                 }
             }
 
+            if (ingredients.isNotEmpty()) {
+                WholeDishCard(ingredients, servings, cookedWeight) { vm.cookedWeight.value = it }
+            }
+
             SectionCard(title = "Приготовление", subtitle = "Каждый шаг — с новой строки") {
                 OutlinedTextField(
                     value = steps,
@@ -152,9 +157,60 @@ fun RecipeEditorScreen(onSaved: (Long) -> Unit, onBack: () -> Unit) {
     }
 }
 
+/** Live totals for the whole pot: calories, macros, weight and per-100 g of the finished dish. */
 @Composable
-private fun NumberField(label: String, value: String, modifier: Modifier, onChange: (String) -> Unit) {
-    var text by remember { mutableStateOf(value) }
+private fun WholeDishCard(
+    ingredients: List<com.example.calorietracker.data.RecipeIngredient>,
+    servings: Int,
+    cookedWeight: String,
+    onCookedWeight: (String) -> Unit
+) {
+    val kcal = ingredients.sumOf { it.calories }
+    val p = ingredients.sumOf { it.protein }
+    val f = ingredients.sumOf { it.fat }
+    val c = ingredients.sumOf { it.carbs }
+    val raw = ingredients.sumOf { it.grams }
+    val cooked = cookedWeight.toNumberOrNull()?.takeIf { it > 0 }
+    val base = cooked ?: raw
+    SectionCard(title = "Всё блюдо", subtitle = "Считается по ингредиентам на лету", containerColor = MaterialTheme.colorScheme.primaryContainer) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            com.example.calorietracker.ui.components.AnimatedNumber(kcal.roundToInt(), MaterialTheme.typography.displaySmall, MaterialTheme.colorScheme.onPrimaryContainer)
+            Spacer(Modifier.width(6.dp))
+            Text("ккал", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(bottom = 6.dp))
+        }
+        Text(
+            "Б ${p.roundToInt()} · Ж ${f.roundToInt()} · У ${c.roundToInt()} г · сырые продукты ${raw.roundToInt()} г",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = cookedWeight,
+            onValueChange = onCookedWeight,
+            label = { Text("Вес готового блюда, г (необязательно)") },
+            supportingText = { Text("Взвесь кастрюлю с едой и вычти вес пустой — так КБЖУ на 100 г будет точным") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(8.dp))
+        val s = servings.coerceAtLeast(1)
+        Row(Modifier.fillMaxWidth()) {
+            Column(Modifier.weight(1f)) {
+                Text("На 100 г готового", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text("${(kcal / base * 100).roundToInt()} ккал", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            Column(Modifier.weight(1f)) {
+                Text("Порция (1 из $s)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text("${(kcal / s).roundToInt()} ккал · ${(base / s).roundToInt()} г", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NumberField(label: String, value: String, modifier: Modifier, key: Any? = null, onChange: (String) -> Unit) {
+    var text by remember(key) { mutableStateOf(value) }
     OutlinedTextField(
         value = text,
         onValueChange = { text = it; onChange(it) },

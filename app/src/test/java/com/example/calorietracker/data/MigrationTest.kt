@@ -53,7 +53,7 @@ class MigrationTest {
         helper.close()
 
         val db = Room.databaseBuilder(context, AppDatabase::class.java, name)
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
         runBlocking {
@@ -70,6 +70,8 @@ class MigrationTest {
             // New tables are usable.
             db.trackingDao().upsertWater(WaterEntry(20000L, 750))
             assertEquals(750, db.trackingDao().water(20000L).first()?.ml)
+            db.dietDao().upsert(Diet(0, "Тест", "", 30, 30, 40, -10, 3, "", "сахар=", false))
+            assertEquals(1, db.dietDao().all().first().size)
         }
         db.close()
     }

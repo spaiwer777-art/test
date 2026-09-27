@@ -74,11 +74,13 @@ fun PlanScreen(onOpenRecipe: (Long) -> Unit, onOpenSettings: () -> Unit, onBack:
     val plan by vm.plan.collectAsState()
     val gen by vm.gen.collectAsState()
     val goal by vm.dailyGoal.collectAsState()
+    val dietName by vm.dietName.collectAsState()
     val today = LocalDate.now().toEpochDay()
     PlanContent(
         plan = plan,
         gen = gen,
         dailyGoal = goal,
+        dietName = dietName,
         onGenerateAi = vm::generateWithAi,
         onGenerateRecipes = vm::generateFromRecipes,
         onAddMeal = { m ->
@@ -99,6 +101,7 @@ internal fun PlanContent(
     plan: MealPlanData?,
     gen: PlanGenState,
     dailyGoal: Double,
+    dietName: String?,
     onGenerateAi: (days: Int, snack: Boolean, prefs: String) -> Unit,
     onGenerateRecipes: (days: Int, snack: Boolean) -> Unit,
     onAddMeal: (PlanMeal) -> Unit,
@@ -126,7 +129,10 @@ internal fun PlanContent(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                SectionCard(title = "Составить рацион", subtitle = "Цель: ${dailyGoal.roundToInt()} ккал в день (меняется в настройках)") {
+                SectionCard(
+                    title = "Составить рацион",
+                    subtitle = "Цель: ${dailyGoal.roundToInt()} ккал в день" + (dietName?.let { " · диета «$it»" } ?: "")
+                ) {
                     Text("Дней", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

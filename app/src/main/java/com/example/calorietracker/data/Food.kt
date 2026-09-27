@@ -9,7 +9,11 @@ enum class FoodSource(val label: String) {
     USER("Мой продукт"),
     BARCODE("Штрихкод · Open Food Facts"),
     ONLINE("Open Food Facts"),
-    BUILTIN("Справочная база")
+    BUILTIN("Справочник РФ"),
+    USDA("USDA (США)");
+
+    /** Read-only reference data shipped with the app. */
+    val isReference: Boolean get() = this == BUILTIN || this == USDA
 }
 
 /**

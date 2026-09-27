@@ -5,9 +5,11 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -61,6 +63,12 @@ class SettingsRepository(private val context: Context) {
     private val weightKey = doublePreferencesKey("profile_weight")
     private val activityKey = stringPreferencesKey("profile_activity")
     private val goalKey = stringPreferencesKey("profile_goal")
+    private val activeDietKey = longPreferencesKey("active_diet")
+    private val splitKey = stringPreferencesKey("macro_split")
+    private val onboardedKey = booleanPreferencesKey("onboarded")
+    private val cloudSessionKey = stringPreferencesKey("cloud_session")
+    private val cloudLastSyncKey = longPreferencesKey("cloud_last_sync")
+    private val cloudAutoKey = booleanPreferencesKey("cloud_auto")
 
     val dailyGoal: Flow<Double> = context.dataStore.data.map { it[dailyGoalKey] ?: 2000.0 }
     val groqApiKey: Flow<String> = context.dataStore.data.map { it[groqApiKeyKey] ?: "" }
@@ -93,6 +101,75 @@ class SettingsRepository(private val context: Context) {
             it[weightKey] = value.weightKg
             it[activityKey] = value.activity.name
             it[goalKey] = value.goal.name
+        }
+    }
+
+    /** Active diet id, 0 = none. */
+    val activeDietId: Flow<Long> = context.dataStore.data.map { it[activeDietKey] ?: 0L }
+
+    /** Macro split used for daily macro goals: the active diet's, or 20/30/50. */
+    val macroSplit: Flow<MacroSplit> = context.dataStore.data.map { prefs ->
+        prefs[splitKey]?.split('/')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 3 }
+            ?.let { MacroSplit(it[0], it[1], it[2]) } ?: MacroSplit.DEFAULT
+    }
+
+    val onboarded: Flow<Boolean> = context.dataStore.data.map { it[onboardedKey] ?: false }
+
+    suspend fun setActiveDiet(diet: Diet?) {
+        context.dataStore.edit {
+            it[activeDietKey] = diet?.id ?: 0L
+            val split = diet?.split ?: MacroSplit.DEFAULT
+            it[splitKey] = "${split.protein}/${split.fat}/${split.carbs}"
+        }
+    }
+
+    /** Signed-in cloud session, stored as JSON in the app's private DataStore. */
+    val cloudSession: Flow<com.example.calorietracker.data.cloud.CloudSession?> = context.dataStore.data.map { prefs ->
+        prefs[cloudSessionKey]?.let { runCatching { com.google.gson.Gson().fromJson(it, com.example.calorietracker.data.cloud.CloudSession::class.java) }.getOrNull() }
+    }
+    val cloudLastSync: Flow<Long> = context.dataStore.data.map { it[cloudLastSyncKey] ?: 0L }
+    val cloudAuto: Flow<Boolean> = context.dataStore.data.map { it[cloudAutoKey] ?: true }
+
+    suspend fun setCloudSession(value: com.example.calorietracker.data.cloud.CloudSession?) {
+        context.dataStore.edit {
+            if (value == null) it.remove(cloudSessionKey) else it[cloudSessionKey] = com.google.gson.Gson().toJson(value)
+        }
+    }
+
+    suspend fun setCloudLastSync(value: Long) {
+        context.dataStore.edit { it[cloudLastSyncKey] = value }
+    }
+
+    suspend fun setCloudAuto(value: Boolean) {
+        context.dataStore.edit { it[cloudAutoKey] = value }
+    }
+
+    suspend fun setOnboarded(value: Boolean) {
+        context.dataStore.edit { it[onboardedKey] = value }
+    }
+
+    /** Everything worth carrying over to another phone (not the API key or the theme cache). */
+    suspend fun snapshot(): Map<String, String> =
+        context.dataStore.data.first().asMap()
+            .filterKeys { it.name !in setOf("groq_api_key", "seed_version", "onboarded") && !it.name.startsWith("cloud_") }
+            .mapKeys { it.key.name }.mapValues { it.value.toString() }
+
+    /** Restores values written by [snapshot]; types are taken from the known keys. */
+    suspend fun restore(values: Map<String, String>) {
+        context.dataStore.edit { prefs ->
+            values["daily_calorie_goal"]?.toDoubleOrNull()?.let { prefs[dailyGoalKey] = it }
+            values["theme_mode"]?.let { prefs[themeModeKey] = it }
+            values["accent_color"]?.let { prefs[accentKey] = it }
+            values["dynamic_color"]?.toBooleanStrictOrNull()?.let { prefs[dynamicColorKey] = it }
+            values["profile_sex"]?.let { prefs[sexKey] = it }
+            values["profile_age"]?.toIntOrNull()?.let { prefs[ageKey] = it }
+            values["profile_height"]?.toDoubleOrNull()?.let { prefs[heightKey] = it }
+            values["profile_weight"]?.toDoubleOrNull()?.let { prefs[weightKey] = it }
+            values["profile_activity"]?.let { prefs[activityKey] = it }
+            values["profile_goal"]?.let { prefs[goalKey] = it }
+            values["active_diet"]?.toLongOrNull()?.let { prefs[activeDietKey] = it }
+            values["macro_split"]?.let { prefs[splitKey] = it }
+            prefs[onboardedKey] = true
         }
     }
 

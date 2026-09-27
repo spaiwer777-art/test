@@ -45,6 +45,7 @@ import com.example.calorietracker.data.Food
 import com.example.calorietracker.data.FoodSource
 import com.example.calorietracker.data.MealType
 import com.example.calorietracker.ui.components.AnimatedNumber
+import com.example.calorietracker.ui.components.DietWarning
 import com.example.calorietracker.ui.components.MacroDonut
 import com.example.calorietracker.ui.components.MealSelector
 import com.example.calorietracker.ui.components.NutriScoreBadge
@@ -63,6 +64,7 @@ fun FoodDetailsScreen(epochDay: Long, initialMeal: MealType, onAdded: () -> Unit
     val diaryVm: DiaryViewModel = viewModel()
     val food by vm.food.collectAsState()
     val goal by vm.dailyGoal.collectAsState()
+    val conflict by vm.dietConflict.collectAsState()
     val f = food
     if (f == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -78,8 +80,9 @@ fun FoodDetailsScreen(epochDay: Long, initialMeal: MealType, onAdded: () -> Unit
             )
             onAdded()
         },
-        onDelete = if (f.source != FoodSource.BUILTIN) ({ vm.delete(onBack) }) else null,
-        onBack = onBack
+        onDelete = if (!f.source.isReference) ({ vm.delete(onBack) }) else null,
+        onBack = onBack,
+        dietConflict = conflict
     )
 }
 
@@ -91,7 +94,8 @@ internal fun FoodDetailsContent(
     initialMeal: MealType,
     onAdd: (grams: Double, meal: MealType) -> Unit,
     onDelete: (() -> Unit)?,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    dietConflict: String? = null
 ) {
     var gramsText by remember(food.id) { mutableStateOf(formatGrams(food.servingGrams ?: 100.0)) }
     var meal by remember { mutableStateOf(initialMeal) }
@@ -140,6 +144,8 @@ internal fun FoodDetailsContent(
                 Spacer(Modifier.height(16.dp))
                 MacroDonut(food.proteinPer100g, food.fatPer100g, food.carbsPer100g)
             }
+
+            if (dietConflict != null) DietWarning("Не рекомендуется в диете $dietConflict")
 
             SectionCard(title = "Порция") {
                 OutlinedTextField(
@@ -200,7 +206,7 @@ internal fun FoodDetailsContent(
                 food.sugarPer100g?.let { NutrientRow("в т.ч. сахара", it, k, "г", indent = true) }
                 food.fiberPer100g?.let { NutrientRow("Клетчатка", it, k, "г") }
                 food.saltPer100g?.let { NutrientRow("Соль", it, k, "г") }
-                if (food.source == FoodSource.BUILTIN) {
+                if (food.source.isReference) {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Средние справочные значения. Для конкретной марки точнее данные с упаковки.",

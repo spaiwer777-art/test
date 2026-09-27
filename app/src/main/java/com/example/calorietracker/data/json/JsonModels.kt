@@ -13,8 +13,25 @@ data class BuiltinFood(
     val protein: Double,
     val fat: Double,
     val carbs: Double,
-    val servingGrams: Double?,
-    val servingLabel: String?
+    val servingGrams: Double? = null,
+    val servingLabel: String? = null,
+    val fiber: Double? = null,
+    val sugar: Double? = null,
+    val satFat: Double? = null,
+    val salt: Double? = null
+)
+
+data class BuiltinDiet(
+    val id: Long,
+    val name: String,
+    val description: String,
+    val proteinPct: Int,
+    val fatPct: Int,
+    val carbsPct: Int,
+    val calorieAdjustPct: Int,
+    val mealsPerDay: Int,
+    val recommended: String,
+    val avoid: String
 )
 
 data class BuiltinIngredient(val name: String, val grams: Double)
@@ -65,4 +82,27 @@ data class PlanMeal(
     val carbs: Double,
     val note: String? = null,
     val recipeId: Long? = null
+)
+
+/**
+ * Everything that belongs to the user, for backup files and cloud sync.
+ * Built-in reference rows are not included; links to them are stored by name
+ * ([refFoodNames], [refRecipeNames]) because their ids differ between installs.
+ */
+data class BackupData(
+    val version: Int,
+    val createdAt: Long,
+    val settings: Map<String, String>,
+    val foods: List<com.example.calorietracker.data.Food>,
+    val diary: List<com.example.calorietracker.data.DiaryEntry>,
+    val recipes: List<com.example.calorietracker.data.Recipe>,
+    val ingredients: List<com.example.calorietracker.data.RecipeIngredient>,
+    val diets: List<com.example.calorietracker.data.Diet>,
+    val weights: List<com.example.calorietracker.data.WeightEntry>,
+    val water: List<com.example.calorietracker.data.WaterEntry>,
+    val plans: List<com.example.calorietracker.data.MealPlanEntity>,
+    /** Photo rows; `path` holds just the file name inside the backup. */
+    val photos: List<com.example.calorietracker.data.MealPhoto>,
+    val refFoodNames: Map<Long, String>,
+    val refRecipeNames: Map<Long, String>
 )

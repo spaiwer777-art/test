@@ -8,22 +8,29 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FoodDao {
-    @Query("SELECT * FROM foods ORDER BY CASE source WHEN 'BUILTIN' THEN 1 ELSE 0 END, name ASC")
-    fun getAll(): Flow<List<Food>>
-
-    /** User's own and scanned products first, then the reference base. */
     @Query(
         """
-        SELECT * FROM foods WHERE searchName LIKE '%' || :query || '%'
-        ORDER BY CASE source WHEN 'BUILTIN' THEN 1 ELSE 0 END,
-                 CASE WHEN searchName LIKE :query || '%' THEN 0 ELSE 1 END,
-                 length(name), name
-        LIMIT 100
+        SELECT * FROM foods WHERE source IN (:sources)
+        ORDER BY CASE source WHEN 'BUILTIN' THEN 1 WHEN 'USDA' THEN 2 ELSE 0 END, name ASC
+        LIMIT 300
         """
     )
-    fun search(query: String): Flow<List<Food>>
+    fun getAll(sources: List<FoodSource>): Flow<List<Food>>
 
-    @Query("SELECT * FROM foods WHERE source = 'BUILTIN'")
+    /** User's own and scanned products first, then the RU reference base, then USDA. */
+    @Query(
+        """
+        SELECT * FROM foods WHERE searchName LIKE '%' || :query || '%' AND source IN (:sources)
+        ORDER BY CASE source WHEN 'BUILTIN' THEN 1 WHEN 'USDA' THEN 2 ELSE 0 END,
+                 CASE WHEN searchName LIKE :query || '%' THEN 0 ELSE 1 END,
+                 length(name), name
+        LIMIT 150
+        """
+    )
+    fun search(query: String, sources: List<FoodSource>): Flow<List<Food>>
+
+    /** Reference bases, RU first: used to ground AI ingredient estimates. */
+    @Query("SELECT * FROM foods WHERE source IN ('BUILTIN', 'USDA') ORDER BY CASE source WHEN 'BUILTIN' THEN 0 ELSE 1 END, id")
     suspend fun builtin(): List<Food>
 
     @Query("SELECT * FROM foods WHERE id = :id")
@@ -44,8 +51,14 @@ interface FoodDao {
     @Query("DELETE FROM foods WHERE id = :id")
     suspend fun delete(id: Long)
 
-    @Query("DELETE FROM foods WHERE source = 'BUILTIN'")
+    @Query("DELETE FROM foods WHERE source IN ('BUILTIN', 'USDA')")
     suspend fun deleteBuiltin()
+
+    @Query("SELECT id, name FROM foods WHERE source IN ('BUILTIN', 'USDA')")
+    suspend fun builtinNames(): List<IdName>
+
+    @Query("UPDATE diary_entries SET foodId = :newId WHERE foodId = :oldId")
+    suspend fun remapDiaryFood(oldId: Long, newId: Long?)
 
     @Query("SELECT id, name FROM foods WHERE searchName = ''")
     suspend fun missingSearchName(): List<IdName>

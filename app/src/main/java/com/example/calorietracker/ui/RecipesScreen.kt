@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Cookie
 import androidx.compose.material.icons.filled.EggAlt
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.RamenDining
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
@@ -80,7 +81,12 @@ fun RecipesScreen(onOpen: (Long) -> Unit, onCreate: () -> Unit, bottomBar: @Comp
     val recipes by vm.recipes.collectAsState()
     val query by vm.query.collectAsState()
     val category by vm.category.collectAsState()
-    RecipesContent(recipes, query, category, { vm.query.value = it }, { vm.category.value = it }, onOpen, onCreate, bottomBar)
+    val onlyDiet by vm.onlyDiet.collectAsState()
+    val diet by vm.activeDiet.collectAsState()
+    RecipesContent(
+        recipes, query, category, { vm.query.value = it }, { vm.category.value = it }, onOpen, onCreate, bottomBar,
+        dietName = diet?.name, onlyDiet = onlyDiet, onOnlyDiet = { vm.onlyDiet.value = it }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,7 +99,10 @@ internal fun RecipesContent(
     onCategory: (String?) -> Unit,
     onOpen: (Long) -> Unit,
     onCreate: () -> Unit,
-    bottomBar: @Composable () -> Unit
+    bottomBar: @Composable () -> Unit,
+    dietName: String? = null,
+    onlyDiet: Boolean = false,
+    onOnlyDiet: (Boolean) -> Unit = {}
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("Рецепты", style = MaterialTheme.typography.headlineSmall) }) },
@@ -121,6 +130,14 @@ internal fun RecipesContent(
             }
             item {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (dietName != null) {
+                        FilterChip(
+                            selected = onlyDiet,
+                            onClick = { onOnlyDiet(!onlyDiet) },
+                            label = { Text("Под «$dietName»") },
+                            leadingIcon = { Icon(Icons.Filled.Eco, null, Modifier.size(18.dp)) }
+                        )
+                    }
                     FilterChip(selected = category == null, onClick = { onCategory(null) }, label = { Text("Все") })
                     RECIPE_CATEGORIES.forEach { c ->
                         FilterChip(

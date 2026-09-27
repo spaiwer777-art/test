@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import android.net.Uri
 import com.example.calorietracker.data.Calc
+import com.example.calorietracker.data.DayTotals
+import com.example.calorietracker.data.MacroSplit
 import com.example.calorietracker.data.DiaryEntry
 import com.example.calorietracker.data.MealPhoto
 import com.example.calorietracker.data.MealType
@@ -34,13 +36,13 @@ val MealType.goalShare: Double
         MealType.SNACK -> 0.10
     }
 
-/** Macro goals derived from the calorie goal: 20% protein, 30% fat, 50% carbs by energy. */
+/** Macro goals in grams from the calorie goal and a split (the active diet's, or 20/30/50). */
 data class MacroGoals(val protein: Double, val fat: Double, val carbs: Double) {
     companion object {
-        fun fromCalories(goal: Double) = MacroGoals(
-            protein = goal * 0.20 / 4.0,
-            fat = goal * 0.30 / 9.0,
-            carbs = goal * 0.50 / 4.0
+        fun fromCalories(goal: Double, split: MacroSplit = MacroSplit.DEFAULT) = MacroGoals(
+            protein = goal * split.protein / 100.0 / 4.0,
+            fat = goal * split.fat / 100.0 / 9.0,
+            carbs = goal * split.carbs / 100.0 / 4.0
         )
     }
 }
@@ -48,14 +50,19 @@ data class MacroGoals(val protein: Double, val fat: Double, val carbs: Double) {
 data class DiaryUiState(
     val epochDay: Long = LocalDate.now().toEpochDay(),
     val entries: List<DiaryEntry> = emptyList(),
-    val dailyGoal: Double = 2000.0
+    val dailyGoal: Double = 2000.0,
+    val split: MacroSplit = MacroSplit.DEFAULT,
+    val dietName: String? = null,
+    val streak: Int = 0,
+    /** Calories per day for the week around [epochDay] (Mon..Sun), for the week strip. */
+    val week: List<DayTotals> = emptyList()
 ) {
     val totalCalories: Double get() = entries.sumOf { it.calories }
     val totalProtein: Double get() = entries.sumOf { it.protein }
     val totalFat: Double get() = entries.sumOf { it.fat }
     val totalCarbs: Double get() = entries.sumOf { it.carbs }
     val remaining: Double get() = dailyGoal - totalCalories
-    val macroGoals: MacroGoals get() = MacroGoals.fromCalories(dailyGoal)
+    val macroGoals: MacroGoals get() = MacroGoals.fromCalories(dailyGoal, split)
 
     fun caloriesFor(meal: MealType): Double = entries.filter { it.mealType == meal }.sumOf { it.calories }
 }
@@ -70,10 +77,24 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
     private val selectedEpochDay = MutableStateFlow(LocalDate.now().toEpochDay())
     val selectedDay: StateFlow<Long> = selectedEpochDay.asStateFlow()
 
+    private val activeDiet = settingsRepo.activeDietId.flatMapLatest { graph.diets.observe(it) }
+
     val uiState: StateFlow<DiaryUiState> = selectedEpochDay
         .flatMapLatest { day ->
-            combine(diaryRepo.entriesForDay(day), settingsRepo.dailyGoal) { entries, goal ->
-                DiaryUiState(epochDay = day, entries = entries, dailyGoal = goal)
+            val monday = LocalDate.ofEpochDay(day).with(java.time.DayOfWeek.MONDAY).toEpochDay()
+            combine(
+                diaryRepo.entriesForDay(day),
+                settingsRepo.dailyGoal,
+                combine(settingsRepo.macroSplit, activeDiet) { split, diet -> split to diet?.name },
+                diaryRepo.daysWithEntries(),
+                diaryRepo.dailyTotals(monday, monday + 6)
+            ) { entries, goal, (split, dietName), days, week ->
+                val byDay = week.associateBy { it.epochDay }
+                DiaryUiState(
+                    epochDay = day, entries = entries, dailyGoal = goal, split = split, dietName = dietName,
+                    streak = streakOf(days, LocalDate.now().toEpochDay()),
+                    week = (monday..monday + 6).map { byDay[it] ?: DayTotals(it, 0.0, 0.0, 0.0, 0.0) }
+                )
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DiaryUiState())
@@ -113,6 +134,10 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
 
     fun shiftDay(delta: Long) {
         selectedEpochDay.value += delta
+    }
+
+    fun selectDay(epochDay: Long) {
+        selectedEpochDay.value = epochDay
     }
 
     fun goToToday() {

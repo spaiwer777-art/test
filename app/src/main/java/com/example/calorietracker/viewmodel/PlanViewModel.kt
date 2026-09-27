@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -35,6 +36,12 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
     val dailyGoal: StateFlow<Double> = graph.settings.dailyGoal
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2000.0)
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val dietName: StateFlow<String?> = graph.settings.activeDietId
+        .flatMapLatest { graph.diets.observe(it) }
+        .map { it?.name }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     private val _gen = MutableStateFlow<PlanGenState>(PlanGenState.Idle)
     val gen: StateFlow<PlanGenState> = _gen.asStateFlow()
 
@@ -48,8 +55,9 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
             _gen.value = PlanGenState.Loading
             try {
                 val goal = graph.settings.dailyGoal.first()
-                val macros = MacroGoals.fromCalories(goal)
-                save(graph.ai.generatePlan(key, goal, macros.protein, macros.fat, macros.carbs, days, includeSnack, preferences))
+                val macros = MacroGoals.fromCalories(goal, graph.settings.macroSplit.first())
+                val diet = graph.diets.get(graph.settings.activeDietId.first())
+                save(graph.ai.generatePlan(key, goal, macros.protein, macros.fat, macros.carbs, days, includeSnack, preferences, diet))
                 _gen.value = PlanGenState.Idle
             } catch (e: Exception) {
                 _gen.value = PlanGenState.Error(aiErrorMessage(e))
@@ -60,7 +68,13 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
     fun generateFromRecipes(days: Int, includeSnack: Boolean) {
         viewModelScope.launch {
             val goal = graph.settings.dailyGoal.first()
-            save(PlanBuilder.build(graph.recipes.allOnce(), graph.recipes.totalGrams(), goal, days, includeSnack))
+            val diet = graph.diets.get(graph.settings.activeDietId.first())
+            save(
+                PlanBuilder.build(
+                    graph.recipes.allOnce(), graph.recipes.totalGrams(), goal, days, includeSnack,
+                    diet = diet, ingredients = graph.recipes.ingredientsOnce()
+                )
+            )
             _gen.value = PlanGenState.Idle
         }
     }

@@ -80,6 +80,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val themeMode by vm.themeMode.collectAsState()
     val accent by vm.accent.collectAsState()
     val dynamicColor by vm.dynamicColor.collectAsState()
+    val split by vm.macroSplit.collectAsState()
 
     var goalText by remember(goal) { mutableStateOf(goal.roundToInt().toString()) }
     var apiKeyText by remember(apiKey) { mutableStateOf(apiKey) }
@@ -156,7 +157,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                val macros = MacroGoals.fromCalories(goalText.toDoubleOrNull() ?: goal)
+                val macros = MacroGoals.fromCalories(goalText.toDoubleOrNull() ?: goal, split)
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Нормы БЖУ: белки ${macros.protein.roundToInt()} г · жиры ${macros.fat.roundToInt()} г · углеводы ${macros.carbs.roundToInt()} г",

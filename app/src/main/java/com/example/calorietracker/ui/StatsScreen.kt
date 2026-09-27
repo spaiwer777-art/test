@@ -523,7 +523,7 @@ private fun MealsCard(state: StatsUiState) {
 
 @Composable
 private fun MacrosCard(state: StatsUiState) {
-    val goals = MacroGoals.fromCalories(state.dailyGoal)
+    val goals = MacroGoals.fromCalories(state.dailyGoal, state.split)
     SectionCard(title = "БЖУ", subtitle = "Среднее в день против нормы и доля калорий") {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             MacroBar("Углеводы", state.averageCarbs, goals.carbs, macroColor(Macro.CARBS), Modifier.weight(1f))

@@ -1,3 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.CalorieTracker" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Launch screen with the logo; switches to the app theme once the first frame is ready. -->
+    <style name="Theme.CalorieTracker.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.CalorieTracker</item>
+    </style>
 </resources>

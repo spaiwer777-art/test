@@ -18,7 +18,36 @@ data class Recipe(
     val caloriesPerServing: Double,
     val proteinPerServing: Double,
     val fatPerServing: Double,
-    val carbsPerServing: Double
+    val carbsPerServing: Double,
+    /** Weight of the finished dish (water boils off or is absorbed); null = sum of raw ingredients. */
+    val cookedWeight: Double? = null
+) {
+    val totalCalories get() = caloriesPerServing * servings
+    val totalProtein get() = proteinPerServing * servings
+    val totalFat get() = fatPerServing * servings
+    val totalCarbs get() = carbsPerServing * servings
+}
+
+/**
+ * A diet: target macro split, calorie adjustment against maintenance, meal
+ * count, advice text and "avoid" keywords used to flag unsuitable foods.
+ */
+@Entity(tableName = "diets")
+data class Diet(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val description: String,
+    val proteinPct: Int,
+    val fatPct: Int,
+    val carbsPct: Int,
+    /** Percent change of the calorie target vs. maintenance, e.g. -15 for weight loss. */
+    val calorieAdjustPct: Int,
+    val mealsPerDay: Int,
+    /** Advice, one item per line. */
+    val recommended: String,
+    /** Comma-separated keywords, see [DietRules]. */
+    val avoid: String,
+    val isBuiltin: Boolean
 )
 
 /** Ingredient line; per-100g values are copied in so a recipe never depends on the foods table. */

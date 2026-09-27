@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Soft cream-green matching the logo tile, behind the adaptive icon and splash. -->
+    <color name="ic_launcher_background">#EEF2DC</color>
+</resources>

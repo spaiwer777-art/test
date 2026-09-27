@@ -44,6 +44,8 @@ object FoodMatcher {
             Scored(food, matched, baseStems.size - matched, baseState.isEmpty())
         }
         if (scored.isEmpty()) return null
+        // Grains and pasta differ ~3x dry vs cooked: without a stated state, don't guess.
+        if (itemState.isEmpty() && scored.any { "dry" in states(words(it.food.name).map(::stem)) }) return null
         // Without a stated cooking state, only trust an unambiguous stateless match.
         val pool = if (itemState.isEmpty()) scored.filter { it.stateless }.ifEmpty {
             if (scored.size == 1) scored else return null

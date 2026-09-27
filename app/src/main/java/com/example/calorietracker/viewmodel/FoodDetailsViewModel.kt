@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.calorietracker.data.Food
 import com.example.calorietracker.graph
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -20,6 +21,14 @@ class FoodDetailsViewModel(application: Application, handle: SavedStateHandle) :
 
     val dailyGoal: StateFlow<Double> = graph.settings.dailyGoal
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2000.0)
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val dietConflict: StateFlow<String?> = kotlinx.coroutines.flow.combine(
+        graph.settings.activeDietId.flatMapLatest { graph.diets.observe(it) }, food
+    ) { diet, f ->
+        if (diet == null || f == null) null
+        else com.example.calorietracker.data.DietRules.conflict(diet, f.name)?.let { "«${diet.name}»: $it" }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun delete(onDone: () -> Unit) {
         viewModelScope.launch {
