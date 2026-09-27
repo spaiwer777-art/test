@@ -179,6 +179,12 @@ class ScreenshotTest {
         }
     }
 
+    @Test fun sourcePickerOpen() = themed(dark = false, fontScale = 1.3f, narrow = true) {
+        androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(16.dp)) {
+            SourcePicker(com.example.calorietracker.viewmodel.SearchFilter.USDA, {}, initiallyOpen = true)
+        }
+    }
+
     @Test fun profile() = themed(dark = false, tall = true) {
         ProfileContent(
             com.example.calorietracker.viewmodel.ProfileUiState(

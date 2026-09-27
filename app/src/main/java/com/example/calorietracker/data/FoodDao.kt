@@ -12,7 +12,7 @@ interface FoodDao {
         """
         SELECT * FROM foods WHERE source IN (:sources)
         ORDER BY CASE source WHEN 'BUILTIN' THEN 1 WHEN 'USDA' THEN 2 ELSE 0 END, name ASC
-        LIMIT 300
+        LIMIT 5000
         """
     )
     fun getAll(sources: List<FoodSource>): Flow<List<Food>>
@@ -24,7 +24,7 @@ interface FoodDao {
         ORDER BY CASE source WHEN 'BUILTIN' THEN 1 WHEN 'USDA' THEN 2 ELSE 0 END,
                  CASE WHEN searchName LIKE :query || '%' THEN 0 ELSE 1 END,
                  length(name), name
-        LIMIT 150
+        LIMIT 500
         """
     )
     fun search(query: String, sources: List<FoodSource>): Flow<List<Food>>

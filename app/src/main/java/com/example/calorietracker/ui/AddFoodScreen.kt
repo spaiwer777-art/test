@@ -51,6 +51,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
@@ -343,9 +349,6 @@ internal fun SearchTools(
         val tileStyle = groupFontSize(
             listOf("Штрихкод", "Описать ИИ", "Вручную"), MaterialTheme.typography.labelLarge, (maxWidth - 20.dp) / 3 - 16.dp
         )
-        val segmentStyle = groupFontSize(
-            SearchFilter.entries.map { it.label }, MaterialTheme.typography.labelLarge, maxWidth / SearchFilter.entries.size - 10.dp
-        )
         Column {
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ActionTile(Icons.Filled.QrCodeScanner, "Штрихкод", tileStyle, Modifier.weight(1f), onScan)
@@ -353,15 +356,7 @@ internal fun SearchTools(
                 ActionTile(Icons.Filled.Add, "Вручную", tileStyle, Modifier.weight(1f), onManual)
             }
             Spacer(Modifier.height(12.dp))
-            SourceSwitch(filter, onFilter, segmentStyle)
-            AnimatedContent(filter, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "hint") { f ->
-                Text(
-                    f.hint,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp)
-                )
-            }
+            SourcePicker(filter, onFilter)
         }
     }
 }
@@ -401,31 +396,103 @@ private fun EmptyHint(
     }
 }
 
-/** Five equal segments in one pill; tight padding so labels stay readable on narrow, large-font screens. */
+private val SearchFilter.icon: androidx.compose.ui.graphics.vector.ImageVector
+    get() = when (this) {
+        SearchFilter.ALL -> Icons.Filled.Layers
+        SearchFilter.MINE -> Icons.Filled.Inventory2
+        SearchFilter.RU -> Icons.Filled.MenuBook
+        SearchFilter.USDA -> Icons.Filled.Public
+        SearchFilter.OFF -> Icons.Filled.Storefront
+    }
+
+/**
+ * «Где ищем»: the current source as a card; tapping it unfolds the other sources with
+ * their descriptions. Full-size text, nothing squeezed into narrow segments.
+ */
 @Composable
-private fun SourceSwitch(filter: SearchFilter, onFilter: (SearchFilter) -> Unit, style: androidx.compose.ui.text.TextStyle) {
+internal fun SourcePicker(filter: SearchFilter, onFilter: (SearchFilter) -> Unit, initiallyOpen: Boolean = false) {
+    var open by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(initiallyOpen) }
     val scheme = MaterialTheme.colorScheme
-    val shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
-    Row(
-        Modifier.fillMaxWidth().height(44.dp).clip(shape)
-            .border(1.dp, scheme.outline, shape)
+    val arrow by androidx.compose.animation.core.animateFloatAsState(if (open) 180f else 0f, label = "arrow")
+    val border by androidx.compose.animation.animateColorAsState(
+        if (open) scheme.primary else scheme.outlineVariant.copy(alpha = 0.6f), label = "border"
+    )
+    androidx.compose.material3.Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = scheme.surfaceContainer,
+        border = androidx.compose.foundation.BorderStroke(1.dp, border),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            .animateContentSize(androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 500f))
     ) {
-        SearchFilter.entries.forEachIndexed { i, f ->
-            if (i > 0) androidx.compose.foundation.layout.Box(Modifier.width(1.dp).fillMaxHeight().background(scheme.outline))
-            val selected = f == filter
-            val bg by androidx.compose.animation.animateColorAsState(
-                if (selected) scheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent, label = "seg"
-            )
-            androidx.compose.foundation.layout.Box(
-                Modifier.weight(1f).fillMaxHeight().background(bg)
-                    .clickable(role = androidx.compose.ui.semantics.Role.Tab) { onFilter(f) },
-                contentAlignment = Alignment.Center
+        Column {
+            Row(
+                Modifier.fillMaxWidth().clickable { open = !open }.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    f.label, style = style, maxLines = 1, softWrap = false,
-                    color = if (selected) scheme.onSecondaryContainer else scheme.onSurface
+                SourceIcon(filter.icon, selected = true)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Где ищем", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+                    AnimatedContent(filter, transitionSpec = {
+                        (androidx.compose.animation.slideInVertically { it / 2 } + fadeIn()) togetherWith
+                            (androidx.compose.animation.slideOutVertically { -it / 2 } + fadeOut())
+                    }, label = "source") { f ->
+                        Text(f.label, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                Icon(
+                    Icons.Filled.ExpandMore, if (open) "Свернуть" else "Выбрать источник",
+                    tint = scheme.onSurfaceVariant,
+                    modifier = Modifier.graphicsLayer(rotationZ = arrow)
                 )
+            }
+            if (!open) {
+                Text(
+                    filter.hint, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 66.dp, end = 14.dp, bottom = 12.dp)
+                )
+            } else {
+                androidx.compose.material3.HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+                Column(Modifier.padding(6.dp)) {
+                    SearchFilter.entries.forEachIndexed { i, f ->
+                        // Options slide in one after another.
+                        val still = androidx.compose.ui.platform.LocalInspectionMode.current
+                        val appear = remember { androidx.compose.animation.core.Animatable(if (still) 1f else 0f) }
+                        androidx.compose.runtime.LaunchedEffect(Unit) {
+                            kotlinx.coroutines.delay(i * 35L)
+                            appear.animateTo(1f, androidx.compose.animation.core.tween(220))
+                        }
+                        val selected = f == filter
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .graphicsLayer(alpha = appear.value, translationY = (1 - appear.value) * 24f)
+                                .clip(MaterialTheme.shapes.small)
+                                .background(if (selected) scheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+                                .clickable { onFilter(f); open = false }
+                                .padding(horizontal = 8.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SourceIcon(f.icon, selected)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(f.label, style = MaterialTheme.typography.titleSmall)
+                                Text(f.hint, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                            }
+                            if (selected) Icon(Icons.Filled.Check, null, tint = scheme.primary)
+                        }
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SourceIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    androidx.compose.foundation.layout.Box(
+        Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape)
+            .background(if (selected) scheme.primary.copy(alpha = 0.16f) else scheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center
+    ) { Icon(icon, null, tint = if (selected) scheme.primary else scheme.onSurfaceVariant, modifier = Modifier.size(22.dp)) }
 }
