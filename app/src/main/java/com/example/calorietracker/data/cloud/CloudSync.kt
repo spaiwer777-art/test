@@ -120,7 +120,12 @@ class CloudSync {
         val request = Request.Builder()
             .url(url + path)
             .header("apikey", anonKey)
-            .header("Authorization", "Bearer ${token ?: anonKey}")
+            // Publishable keys (sb_publishable_…) go only in `apikey`; Authorization carries the
+            // signed-in user's JWT. Legacy JWT anon keys still work as a bearer for anonymous calls.
+            .apply {
+                val bearer = token ?: anonKey.takeIf { !it.startsWith("sb_") }
+                if (bearer != null) header("Authorization", "Bearer $bearer")
+            }
             .apply { extraHeaders.forEach { (k, v) -> header(k, v) } }
             .method(method, body?.let { gson.toJson(it).toRequestBody(json) })
             .build()
