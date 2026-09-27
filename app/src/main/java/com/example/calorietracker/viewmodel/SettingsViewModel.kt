@@ -32,6 +32,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val dynamicColor: StateFlow<Boolean> = repo.dynamicColor
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val appName: StateFlow<String> = repo.appName
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    fun setAppName(value: String) {
+        viewModelScope.launch { repo.setAppName(value) }
+    }
+
     fun setDailyGoal(value: Double) {
         viewModelScope.launch { repo.setDailyGoal(value) }
     }

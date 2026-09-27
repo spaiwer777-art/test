@@ -81,6 +81,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenProfile: () -> Unit) {
     val themeMode by vm.themeMode.collectAsState()
     val accent by vm.accent.collectAsState()
     val dynamicColor by vm.dynamicColor.collectAsState()
+    val appName by vm.appName.collectAsState()
 
     var apiKeyText by remember(apiKey) { mutableStateOf(apiKey) }
     var keySaved by remember { mutableStateOf(false) }
@@ -168,6 +169,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpenProfile: () -> Unit) {
                     }
                     Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
+            }
+
+            Section("Значок и название") {
+                AppIconSection(appName, vm::setAppName)
             }
 
             Section("ИИ: быстрый ввод текстом") {

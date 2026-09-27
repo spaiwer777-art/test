@@ -72,6 +72,7 @@ class SettingsRepository(private val context: Context) {
     private val cloudAutoKey = booleanPreferencesKey("cloud_auto")
     private val waterGoalKey = intPreferencesKey("water_goal_ml")
     private val calorieAutoKey = booleanPreferencesKey("calorie_auto")
+    private val appNameKey = stringPreferencesKey("app_name")
 
     val dailyGoal: Flow<Double> = context.dataStore.data.map { it[dailyGoalKey] ?: 2000.0 }
     /** Own daily water goal in ml; 0 = calculate from weight and activity. */
@@ -81,6 +82,13 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setWaterGoalMl(value: Int) {
         context.dataStore.edit { it[waterGoalKey] = value.coerceAtLeast(0) }
+    }
+
+    /** Name for the home-screen shortcut; blank = the app's own name. */
+    val appName: Flow<String> = context.dataStore.data.map { it[appNameKey] ?: "" }
+
+    suspend fun setAppName(value: String) {
+        context.dataStore.edit { it[appNameKey] = value.trim() }
     }
 
     suspend fun setCalorieAuto(value: Boolean) {
@@ -200,6 +208,7 @@ class SettingsRepository(private val context: Context) {
             values["macro_grams"]?.let { prefs[macroGramsKey] = it }
             values["water_goal_ml"]?.toIntOrNull()?.let { prefs[waterGoalKey] = it }
             values["calorie_auto"]?.toBooleanStrictOrNull()?.let { prefs[calorieAutoKey] = it }
+            values["app_name"]?.let { prefs[appNameKey] = it }
             prefs[onboardedKey] = true
         }
     }

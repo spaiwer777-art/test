@@ -31,12 +31,12 @@ sealed class OnlineState {
 }
 
 /** Which databases the search looks in. */
-enum class SearchFilter(val label: String, val sources: List<FoodSource>, val online: Boolean) {
-    ALL("Все базы", FoodSource.entries, true),
-    MINE("Мои", listOf(FoodSource.USER, FoodSource.BARCODE, FoodSource.ONLINE), false),
-    RU("Справочник РФ", listOf(FoodSource.BUILTIN), false),
-    USDA("USDA", listOf(FoodSource.USDA), false),
-    OFF("Магазинные (OFF)", emptyList(), true)
+enum class SearchFilter(val label: String, val hint: String, val sources: List<FoodSource>, val online: Boolean) {
+    ALL("Все", "Ищем везде: твои продукты, базовые, мировые и товары из магазинов", FoodSource.entries, true),
+    MINE("Мои", "Продукты, которые ты добавил сам или по штрихкоду", listOf(FoodSource.USER, FoodSource.BARCODE, FoodSource.ONLINE), false),
+    RU("Базовые", "Справочник обычных продуктов: крупы, мясо, молочка, овощи, фрукты", listOf(FoodSource.BUILTIN), false),
+    USDA("Мировые", "Большая база Минсельхоза США (USDA), переведена на русский", listOf(FoodSource.USDA), false),
+    OFF("Товары", "Упакованные товары из магазинов с этикеткой — открытая база Open Food Facts", emptyList(), true)
 }
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)

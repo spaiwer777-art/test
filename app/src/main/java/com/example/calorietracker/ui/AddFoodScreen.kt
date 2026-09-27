@@ -49,6 +49,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -118,20 +124,7 @@ fun AddFoodScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = onScan, label = { Text("Штрихкод") }, leadingIcon = { Icon(Icons.Filled.QrCodeScanner, null) })
-                    AssistChip(onClick = { onAi(query) }, label = { Text("Описать ИИ") }, leadingIcon = { Icon(Icons.Filled.AutoAwesome, null) })
-                    AssistChip(onClick = { showManualDialog = true }, label = { Text("Вручную") }, leadingIcon = { Icon(Icons.Filled.Add, null) })
-                }
-            }
-            item {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SearchFilter.entries.forEach { f ->
-                        FilterChip(selected = filter == f, onClick = { vm.setFilter(f) }, label = { Text(f.label) })
-                    }
-                }
-            }
+            item { SearchTools(filter, vm::setFilter, onScan, { onAi(query) }, { showManualDialog = true }) }
 
             fun section(title: String, list: List<Food>, key: String) {
                 if (list.isEmpty()) return
@@ -139,15 +132,15 @@ fun AddFoodScreen(
                 items(list, key = { "$key${it.id}" }) { food -> FoodRow(food, Modifier.animateItem()) { onOpenFood(food.id) } }
             }
             section("Мои продукты", mine, "m")
-            section("Справочник РФ", ru, "r")
-            section("USDA — база Минсельхоза США (перевод)", usda, "u")
+            section("Базовые продукты", ru, "r")
+            section("Мировые · USDA", usda, "u")
 
             if (filter.sources.isNotEmpty() && results.isEmpty() && query.isNotBlank()) {
                 item { Text("В офлайн-базах ничего не нашлось.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp)) }
             }
 
             if (filter.online && query.trim().length >= 2) {
-                item { SectionHeader("Магазинные продукты · Open Food Facts") }
+                item { SectionHeader("Товары из магазинов · Open Food Facts") }
                 item {
                     AnimatedContent(online, transitionSpec = { fadeIn() togetherWith fadeOut() }, contentKey = { it::class }, label = "online") { s ->
                         when (s) {
@@ -270,4 +263,73 @@ private fun ManualFoodDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
+}
+
+/** One of three equal quick actions above the search results. */
+@Composable
+private fun ActionTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, modifier: Modifier, onClick: () -> Unit) {
+    androidx.compose.material3.Surface(
+        onClick = onClick,
+        modifier = modifier.height(84.dp),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.size(36.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }
+            Spacer(Modifier.height(6.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        }
+    }
+}
+
+/** Quick actions (barcode, AI, manual) and the source switch with a one-line explanation. */
+@Composable
+internal fun SearchTools(
+    filter: SearchFilter,
+    onFilter: (SearchFilter) -> Unit,
+    onScan: () -> Unit,
+    onAi: () -> Unit,
+    onManual: () -> Unit
+) {
+    Column {
+        Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ActionTile(Icons.Filled.QrCodeScanner, "Штрихкод", Modifier.weight(1f), onScan)
+            ActionTile(Icons.Filled.AutoAwesome, "Описать ИИ", Modifier.weight(1f), onAi)
+            ActionTile(Icons.Filled.Add, "Вручную", Modifier.weight(1f), onManual)
+        }
+        Spacer(Modifier.height(12.dp))
+        // Five equal segments: cap the system font scale so labels never get clipped on large-font phones.
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, minOf(density.fontScale, 1f))
+        ) {
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                SearchFilter.entries.forEachIndexed { i, f ->
+                    SegmentedButton(
+                        selected = filter == f,
+                        onClick = { onFilter(f) },
+                        shape = SegmentedButtonDefaults.itemShape(i, SearchFilter.entries.size),
+                        icon = {}
+                    ) { Text(f.label, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false) }
+                }
+            }
+        }
+        AnimatedContent(filter, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "hint") { f ->
+            Text(
+                f.hint,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp)
+            )
+        }
+    }
 }

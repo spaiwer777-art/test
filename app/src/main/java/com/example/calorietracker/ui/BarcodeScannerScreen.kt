@@ -36,6 +36,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 
 @OptIn(ExperimentalMaterial3Api::class)
+@androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 @Composable
 fun BarcodeScannerScreen(onFound: (Long) -> Unit, onSearchByName: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current

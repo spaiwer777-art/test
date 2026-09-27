@@ -30,6 +30,8 @@ import com.example.calorietracker.viewmodel.DiaryUiState
 import com.example.calorietracker.viewmodel.StatsRange
 import com.example.calorietracker.viewmodel.StatsUiState
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalInspectionMode
 import com.example.calorietracker.viewmodel.AccountStatus
 import org.junit.Rule
@@ -157,6 +159,26 @@ class ScreenshotTest {
         AuthContent(true, true, AccountStatus.Idle, SignedIn("anna@mail.ru", true), { _, _ -> }, { _, _ -> }, {}, {}, {}, {})
     }
 
+    @Test fun searchTools() = themed(dark = false) {
+        androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(16.dp)) {
+            SearchTools(com.example.calorietracker.viewmodel.SearchFilter.OFF, {}, {}, {}, {})
+        }
+    }
+
+    @Test fun searchToolsLargeFont() = themed(dark = true, fontScale = 1.3f) {
+        androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(16.dp)) {
+            SearchTools(com.example.calorietracker.viewmodel.SearchFilter.RU, {}, {}, {}, {})
+        }
+    }
+
+    @Test fun appIconSettings() = themed(dark = false) {
+        androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(16.dp)) {
+            AppIconContent(
+                com.example.calorietracker.AppIcon.CLASSIC, {}, "Мой дневник", {}, null, {}, {}, true, {}, null
+            )
+        }
+    }
+
     @Test fun profile() = themed(dark = false, tall = true) {
         ProfileContent(
             com.example.calorietracker.viewmodel.ProfileUiState(
@@ -222,12 +244,14 @@ class ScreenshotTest {
         dark: Boolean,
         accent: AccentColor = AccentColor.GREEN,
         tall: Boolean = false,
+        fontScale: Float = 1f,
         content: @androidx.compose.runtime.Composable () -> Unit
     ) {
         paparazzi.unsafeUpdateConfig(
             deviceConfig = DeviceConfig.PIXEL_6.copy(
                 nightMode = if (dark) NightMode.NIGHT else NightMode.NOTNIGHT,
-                screenHeight = if (tall) 6000 else DeviceConfig.PIXEL_6.screenHeight
+                screenHeight = if (tall) 6000 else DeviceConfig.PIXEL_6.screenHeight,
+                fontScale = fontScale
             )
         )
         paparazzi.snapshot {

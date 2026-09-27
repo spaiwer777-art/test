@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Backgrounds for the alternative launcher icons (Настройки → Значок и название). -->
+    <color name="ic_launcher_bg_dark">#1F2B22</color>
+    <color name="ic_launcher_bg_green">#3E7B45</color>
+</resources>
