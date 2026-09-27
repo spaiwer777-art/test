@@ -890,7 +890,7 @@ private fun GoalDialog(
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onOpenProfile) { Text("Все параметры — «О себе»") }
+                    TextButton(onClick = onOpenProfile) { Text("Все параметры и нормы") }
                     if (onAuto != null) TextButton(onClick = onAuto) { Text("Авто") }
                 }
             }

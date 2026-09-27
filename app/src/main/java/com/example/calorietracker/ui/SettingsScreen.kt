@@ -31,7 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
@@ -156,10 +156,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpenProfile: () -> Unit) {
                     Box(
                         Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
-                    ) { Icon(Icons.Filled.Person, null, tint = MaterialTheme.colorScheme.primary) }
+                    ) { Icon(Icons.Filled.Tune, null, tint = MaterialTheme.colorScheme.primary) }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("О себе", style = MaterialTheme.typography.titleMedium)
+                        Text("Параметры и нормы", style = MaterialTheme.typography.titleMedium)
                         Text(
                             "Рост, вес, цель · норма ${goal.roundToInt()} ккал и воды",
                             style = MaterialTheme.typography.bodySmall,

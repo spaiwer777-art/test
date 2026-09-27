@@ -96,7 +96,7 @@ internal fun ProfileContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("О себе") },
+                title = { Text("Параметры и нормы") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") } }
             )
         }

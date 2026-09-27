@@ -33,7 +33,7 @@ data class ProfileUiState(
     val waterGoalMl: Int get() = if (ownWaterMl > 0) ownWaterMl else suggestedWaterMl
 }
 
-/** «О себе»: body data, calorie norm and water norm in one place; every change saves itself. */
+/** «Параметры и нормы»: body data, calorie norm and water norm in one place; every change saves itself. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
     private val graph = application.graph
