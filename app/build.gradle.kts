@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+    // Renders Compose screens to PNG on the JVM (no emulator): ./gradlew recordPaparazziDebug
+    id("app.cash.paparazzi")
 }
 
 android {

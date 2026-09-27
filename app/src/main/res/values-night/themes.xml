@@ -1,0 +1,4 @@
+<resources>
+    <!-- Dark window background so the app doesn't flash white on launch in dark mode. -->
+    <style name="Theme.CalorieTracker" parent="android:Theme.Material.NoActionBar" />
+</resources>

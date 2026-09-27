@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.io.IOException
 
 sealed class AiState {
     object Idle : AiState()
@@ -39,8 +41,18 @@ class AiQuickAddViewModel(application: Application) : AndroidViewModel(applicati
             try {
                 val result = foodRepo.estimateWithAi(description, apiKey)
                 _state.value = AiState.Success(result)
+            } catch (e: HttpException) {
+                _state.value = AiState.Error(
+                    when (e.code()) {
+                        401 -> "Groq не принял API-ключ. Проверь ключ в настройках."
+                        429 -> "Слишком много запросов к Groq. Подожди минуту и попробуй снова."
+                        else -> "Сервер Groq ответил ошибкой ${e.code()}. Попробуй позже."
+                    }
+                )
+            } catch (e: IOException) {
+                _state.value = AiState.Error("Нет подключения к интернету.")
             } catch (e: Exception) {
-                _state.value = AiState.Error(e.message ?: "Не удалось получить оценку от ИИ")
+                _state.value = AiState.Error("ИИ вернул непонятный ответ. Попробуй описать блюдо иначе.")
             }
         }
     }

@@ -4,9 +4,15 @@ import com.example.calorietracker.network.AiNutritionEstimate
 import com.example.calorietracker.network.ChatCompletionRequest
 import com.example.calorietracker.network.ChatMessage
 import com.example.calorietracker.network.NetworkModule
-import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.flow.Flow
+import retrofit2.HttpException
+
+private val PREFERRED_GROQ_MODELS = listOf("openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b")
+private val NON_CHAT_MODEL_MARKERS = listOf("whisper", "guard", "orpheus", "tts", "safeguard")
+
+/** Model used for AI estimates; replaced at runtime if Groq retires it. */
+@Volatile private var groqModel = PREFERRED_GROQ_MODELS.first()
 
 class FoodRepository(private val db: AppDatabase) {
     fun allFoods(): Flow<List<Food>> = db.foodDao().getAll()
@@ -42,17 +48,25 @@ class FoodRepository(private val db: AppDatabase) {
         val systemPrompt = """
             Ты — помощник по подсчёту калорий. Пользователь описывает, что он съел.
             Оцени общее количество калорий и БЖУ (белки, жиры, углеводы в граммах) для всего описанного.
+            Название блюда пиши по-русски.
             Ответь СТРОГО в формате JSON, без пояснений и без markdown:
             {"name": "краткое название блюда", "calories": число, "protein": число, "fat": число, "carbs": число}
         """.trimIndent()
-
-        val request = ChatCompletionRequest(
-            messages = listOf(
-                ChatMessage(role = "system", content = systemPrompt),
-                ChatMessage(role = "user", content = description)
-            )
+        val messages = listOf(
+            ChatMessage(role = "system", content = systemPrompt),
+            ChatMessage(role = "user", content = description)
         )
-        val response = NetworkModule.groqApi.chatCompletion("Bearer $apiKey", request)
+        val bearer = "Bearer $apiKey"
+
+        val response = try {
+            NetworkModule.groqApi.chatCompletion(bearer, ChatCompletionRequest(groqModel, messages))
+        } catch (e: HttpException) {
+            // Groq retires models regularly and then answers 404 model_not_found.
+            // Switch to whatever chat model the account can currently use.
+            if (e.code() != 404) throw e
+            groqModel = pickAvailableModel(bearer) ?: throw e
+            NetworkModule.groqApi.chatCompletion(bearer, ChatCompletionRequest(groqModel, messages))
+        }
         val raw = response.choices.first().message.content
         val json = JsonParser.parseString(extractJson(raw)).asJsonObject
         return AiNutritionEstimate(
@@ -62,6 +76,12 @@ class FoodRepository(private val db: AppDatabase) {
             fat = json.get("fat")?.asDouble ?: 0.0,
             carbs = json.get("carbs")?.asDouble ?: 0.0
         )
+    }
+
+    private suspend fun pickAvailableModel(bearer: String): String? {
+        val ids = NetworkModule.groqApi.listModels(bearer).data.map { it.id }
+        return PREFERRED_GROQ_MODELS.firstOrNull { it in ids }
+            ?: ids.firstOrNull { id -> NON_CHAT_MODEL_MARKERS.none { id.contains(it) } }
     }
 
     /** The model sometimes wraps JSON in prose or code fences; pull out just the {...} block. */
@@ -75,6 +95,7 @@ class FoodRepository(private val db: AppDatabase) {
 class DiaryRepository(private val db: AppDatabase) {
     fun entriesForDay(epochDay: Long): Flow<List<DiaryEntry>> = db.diaryDao().getForDay(epochDay)
     fun daysWithEntries(): Flow<List<Long>> = db.diaryDao().getDaysWithEntries()
+    fun dailyTotals(fromDay: Long, toDay: Long): Flow<List<DayTotals>> = db.diaryDao().dailyTotals(fromDay, toDay)
 
     suspend fun addEntry(entry: DiaryEntry) = db.diaryDao().insert(entry)
     suspend fun deleteEntry(id: Long) = db.diaryDao().delete(id)

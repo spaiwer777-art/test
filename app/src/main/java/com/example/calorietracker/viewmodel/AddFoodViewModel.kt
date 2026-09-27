@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.calorietracker.data.AppDatabase
 import com.example.calorietracker.data.Food
 import com.example.calorietracker.data.FoodRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AddFoodViewModel(application: Application) : AndroidViewModel(application) {
     private val repo = FoodRepository(AppDatabase.get(application))
 

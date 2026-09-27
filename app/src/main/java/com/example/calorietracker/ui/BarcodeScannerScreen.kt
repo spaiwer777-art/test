@@ -16,9 +16,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.calorietracker.data.Food
 import com.example.calorietracker.data.MealType
 import com.example.calorietracker.viewmodel.DiaryViewModel
 import com.example.calorietracker.viewmodel.ScanState
@@ -28,7 +39,7 @@ import com.google.mlkit.vision.common.InputImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BarcodeScannerScreen(onDone: () -> Unit, onBack: () -> Unit) {
+fun BarcodeScannerScreen(epochDay: Long, initialMeal: MealType, onDone: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val vm: ScannerViewModel = viewModel()
@@ -48,7 +59,16 @@ fun BarcodeScannerScreen(onDone: () -> Unit, onBack: () -> Unit) {
         if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Сканировать штрихкод") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Сканер штрихкода") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад") }
+                }
+            )
+        }
+    ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             if (hasPermission) {
                 AndroidView(
@@ -92,6 +112,7 @@ fun BarcodeScannerScreen(onDone: () -> Unit, onBack: () -> Unit) {
                         previewView
                     }
                 )
+                ScannerOverlay()
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Нужен доступ к камере для сканирования штрихкодов")
@@ -109,8 +130,9 @@ fun BarcodeScannerScreen(onDone: () -> Unit, onBack: () -> Unit) {
                     TextButton(onClick = { vm.reset() }) { Text("Повторить") }
                 }
                 is ScanState.Found -> {
-                    FoundFoodDialog(
+                    PortionDialog(
                         food = s.food,
+                        initialMeal = initialMeal,
                         onDismiss = { vm.reset() },
                         onConfirm = { grams, meal ->
                             diaryVm.addEntry(
@@ -120,7 +142,8 @@ fun BarcodeScannerScreen(onDone: () -> Unit, onBack: () -> Unit) {
                                 proteinPer100 = s.food.proteinPer100g,
                                 fatPer100 = s.food.fatPer100g,
                                 carbsPer100 = s.food.carbsPer100g,
-                                meal = meal
+                                meal = meal,
+                                epochDay = epochDay
                             )
                             vm.reset()
                             onDone()
@@ -134,42 +157,41 @@ fun BarcodeScannerScreen(onDone: () -> Unit, onBack: () -> Unit) {
 }
 
 @Composable
-private fun BottomBanner(content: @Composable ColumnScope.() -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+private fun BoxScope.BottomBanner(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp),
+        shape = MaterialTheme.shapes.medium
+    ) {
         Column(Modifier.padding(16.dp), content = content)
     }
 }
 
+/** Rounded viewfinder with a sweeping scan line. */
 @Composable
-private fun FoundFoodDialog(
-    food: Food,
-    onDismiss: () -> Unit,
-    onConfirm: (grams: Double, meal: MealType) -> Unit
-) {
-    var grams by remember { mutableStateOf("100") }
-    var meal by remember { mutableStateOf(MealType.BREAKFAST) }
-    var expanded by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(food.name) },
-        text = {
-            Column {
-                Text("${food.caloriesPer100g.toInt()} ккал / 100 г")
-                OutlinedTextField(value = grams, onValueChange = { grams = it }, label = { Text("Граммы") })
-                Box {
-                    TextButton(onClick = { expanded = true }) { Text("Приём пищи: ${meal.label()}") }
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        MealType.entries.forEach {
-                            DropdownMenuItem(text = { Text(it.label()) }, onClick = { meal = it; expanded = false })
-                        }
-                    }
-                }
+private fun BoxScope.ScannerOverlay() {
+    val transition = rememberInfiniteTransition(label = "scan")
+    val lineFraction by transition.animateFloat(
+        initialValue = 0.1f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "line"
+    )
+    val accent = MaterialTheme.colorScheme.primary
+    Box(
+        Modifier
+            .align(Alignment.Center)
+            .fillMaxWidth(0.8f)
+            .aspectRatio(1.6f)
+            .border(3.dp, Color.White.copy(alpha = 0.9f), MaterialTheme.shapes.medium)
+            .drawBehind {
+                val y = size.height * lineFraction
+                drawLine(accent, Offset(16.dp.toPx(), y), Offset(size.width - 16.dp.toPx(), y), 3.dp.toPx())
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(grams.toDoubleOrNull() ?: 100.0, meal) }) { Text("Добавить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+    Text(
+        "Наведи камеру на штрихкод",
+        color = Color.White,
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp)
     )
 }
