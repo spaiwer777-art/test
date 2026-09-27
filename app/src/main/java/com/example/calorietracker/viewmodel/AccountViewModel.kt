@@ -25,6 +25,7 @@ sealed class AccountStatus {
 class AccountViewModel(application: Application) : AndroidViewModel(application) {
     private val graph = application.graph
     val cloudConfigured = graph.cloud.isConfigured
+    val googleEnabled = graph.cloud.googleEnabled
 
     val session: StateFlow<CloudSession?> = graph.settings.cloudSession
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -51,6 +52,14 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         val s = graph.cloud.signIn(email.trim(), password)
         graph.settings.setCloudSession(s)
         "Вход выполнен. Можно загрузить данные из облака или сохранить текущие."
+    }
+
+    /** Google sign-in needs an Activity context for the system account picker. */
+    fun signInWithGoogle(activityContext: android.content.Context) = run("Вход через Google…") {
+        val token = com.example.calorietracker.data.cloud.GoogleSignIn.requestToken(activityContext, graph.cloud.googleClientId)
+        val s = graph.cloud.signInWithGoogle(token.idToken, token.rawNonce)
+        graph.settings.setCloudSession(s)
+        "Вход выполнен: ${s.email}. Можно загрузить данные из облака или сохранить текущие."
     }
 
     fun signUp(email: String, password: String) = run("Создаю аккаунт…") {

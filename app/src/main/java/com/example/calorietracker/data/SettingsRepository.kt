@@ -66,6 +66,7 @@ class SettingsRepository(private val context: Context) {
     private val activeDietKey = longPreferencesKey("active_diet")
     private val splitKey = stringPreferencesKey("macro_split")
     private val onboardedKey = booleanPreferencesKey("onboarded")
+    private val macroGramsKey = stringPreferencesKey("macro_grams")
     private val cloudSessionKey = stringPreferencesKey("cloud_session")
     private val cloudLastSyncKey = longPreferencesKey("cloud_last_sync")
     private val cloudAutoKey = booleanPreferencesKey("cloud_auto")
@@ -111,6 +112,18 @@ class SettingsRepository(private val context: Context) {
     val macroSplit: Flow<MacroSplit> = context.dataStore.data.map { prefs ->
         prefs[splitKey]?.split('/')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 3 }
             ?.let { MacroSplit(it[0], it[1], it[2]) } ?: MacroSplit.DEFAULT
+    }
+
+    /** Hand-entered macro goals (grams), or null to derive them from the calorie goal and diet. */
+    val macroGrams: Flow<MacroGrams?> = context.dataStore.data.map { prefs ->
+        prefs[macroGramsKey]?.split('/')?.mapNotNull { it.toDoubleOrNull() }?.takeIf { it.size == 3 }
+            ?.let { MacroGrams(it[0], it[1], it[2]) }
+    }
+
+    suspend fun setMacroGrams(value: MacroGrams?) {
+        context.dataStore.edit {
+            if (value == null) it.remove(macroGramsKey) else it[macroGramsKey] = "${value.protein}/${value.fat}/${value.carbs}"
+        }
     }
 
     val onboarded: Flow<Boolean> = context.dataStore.data.map { it[onboardedKey] ?: false }
@@ -169,6 +182,7 @@ class SettingsRepository(private val context: Context) {
             values["profile_goal"]?.let { prefs[goalKey] = it }
             values["active_diet"]?.toLongOrNull()?.let { prefs[activeDietKey] = it }
             values["macro_split"]?.let { prefs[splitKey] = it }
+            values["macro_grams"]?.let { prefs[macroGramsKey] = it }
             prefs[onboardedKey] = true
         }
     }

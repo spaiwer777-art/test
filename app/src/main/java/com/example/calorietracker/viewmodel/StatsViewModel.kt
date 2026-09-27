@@ -38,7 +38,8 @@ data class StatsUiState(
     val water: List<WaterEntry> = emptyList(),
     val waterGoal: Int = 2000,
     val streak: Int = 0,
-    val split: com.example.calorietracker.data.MacroSplit = com.example.calorietracker.data.MacroSplit.DEFAULT
+    val split: com.example.calorietracker.data.MacroSplit = com.example.calorietracker.data.MacroSplit.DEFAULT,
+    val customMacros: com.example.calorietracker.data.MacroGrams? = null
 ) {
     private val loggedDays: List<DayTotals> get() = days.filter { it.calories > 0 }
     val loggedDayCount: Int get() = loggedDays.size
@@ -94,7 +95,8 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
                 graph.tracking.waterRange(from, today),
                 graph.settings.profile,
                 graph.diary.daysWithEntries(),
-                graph.settings.macroSplit
+                graph.settings.macroSplit,
+                graph.settings.macroGrams
             )
             combine(flows) { v ->
                 @Suppress("UNCHECKED_CAST")
@@ -116,7 +118,8 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
                     water = @Suppress("UNCHECKED_CAST") (v[6] as List<WaterEntry>),
                     waterGoal = com.example.calorietracker.data.Calc.waterMl(weights.lastOrNull()?.kg ?: profile.weightKg, profile.activity),
                     streak = streakOf(@Suppress("UNCHECKED_CAST") (v[8] as List<Long>), today),
-                    split = v[9] as com.example.calorietracker.data.MacroSplit
+                    split = v[9] as com.example.calorietracker.data.MacroSplit,
+                    customMacros = v[10] as com.example.calorietracker.data.MacroGrams?
                 )
             }
         }

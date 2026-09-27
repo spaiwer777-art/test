@@ -40,7 +40,13 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
                 val online = repo.lookupBarcodeOnline(barcode)
                 _state.value = if (online != null) ScanState.Found(online) else ScanState.NotFound
             } catch (e: Exception) {
-                _state.value = ScanState.Error(e.message ?: "Ошибка сети")
+                _state.value = ScanState.Error(
+                    when (e) {
+                        is java.io.IOException -> "Нет подключения к интернету"
+                        is retrofit2.HttpException -> "Open Food Facts временно недоступен (${e.code()}). Попробуй позже"
+                        else -> "Не удалось найти продукт"
+                    }
+                )
             }
         }
     }

@@ -55,7 +55,7 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
             _gen.value = PlanGenState.Loading
             try {
                 val goal = graph.settings.dailyGoal.first()
-                val macros = MacroGoals.fromCalories(goal, graph.settings.macroSplit.first())
+                val macros = MacroGoals.fromCalories(goal, graph.settings.macroSplit.first(), graph.settings.macroGrams.first())
                 val diet = graph.diets.get(graph.settings.activeDietId.first())
                 save(graph.ai.generatePlan(key, goal, macros.protein, macros.fat, macros.carbs, days, includeSnack, preferences, diet))
                 _gen.value = PlanGenState.Idle

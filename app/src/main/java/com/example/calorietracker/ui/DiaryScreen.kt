@@ -39,6 +39,13 @@ import com.example.calorietracker.ui.theme.isDarkSurface
 import java.io.File
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.calorietracker.data.MacroGrams
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -158,6 +165,7 @@ fun DiaryScreen(
         onSelectDay = viewModel::selectDay,
         onDelete = viewModel::deleteEntry,
         onSetWater = viewModel::setWater,
+        onSetMacros = viewModel::setCustomMacros,
         onRequestPhoto = requestPhoto,
         onDeletePhoto = viewModel::deletePhoto,
         onAddFood = onAddFood,
@@ -182,6 +190,7 @@ internal fun DiaryContent(
     onSelectDay: (Long) -> Unit,
     onDelete: (Long) -> Unit,
     onSetWater: (Int) -> Unit,
+    onSetMacros: (MacroGrams?, Boolean) -> Unit = { _, _ -> },
     onRequestPhoto: (MealType, fromCamera: Boolean) -> Unit,
     onDeletePhoto: (MealPhoto) -> Unit,
     onAddFood: (day: Long, meal: MealType) -> Unit,
@@ -193,6 +202,7 @@ internal fun DiaryContent(
 ) {
     var sheetEntry by remember { mutableStateOf<DiaryEntry?>(null) }
     var viewedPhoto by remember { mutableStateOf<MealPhoto?>(null) }
+    var editMacros by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -234,7 +244,7 @@ internal fun DiaryContent(
                     onToday = onToday
                 )
             }
-            item { SummaryCard(state) }
+            item { SummaryCard(state, onEditMacros = { editMacros = true }) }
             items(MealType.entries, key = { it.name }) { meal ->
                 MealCard(
                     meal = meal,
@@ -259,6 +269,13 @@ internal fun DiaryContent(
             onDelete = { onDelete(entry.id); sheetEntry = null },
             onOpenFood = entry.foodId?.let { id -> { sheetEntry = null; onOpenFood(id, selectedDay, entry.mealType) } },
             onOpenRecipe = entry.recipeId?.let { id -> { sheetEntry = null; onOpenRecipe(id, selectedDay, entry.mealType) } }
+        )
+    }
+    if (editMacros) {
+        MacroGoalsDialog(
+            state = state,
+            onDismiss = { editMacros = false },
+            onSave = { grams, alsoCalories -> onSetMacros(grams, alsoCalories); editMacros = false }
         )
     }
     viewedPhoto?.let { photo ->
@@ -374,7 +391,7 @@ private fun DayCell(date: LocalDate, progress: Float, selected: Boolean, isToday
 }
 
 @Composable
-private fun SummaryCard(state: DiaryUiState) {
+private fun SummaryCard(state: DiaryUiState, onEditMacros: () -> Unit = {}) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -390,7 +407,20 @@ private fun SummaryCard(state: DiaryUiState) {
                 goal = state.dailyGoal,
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (state.customMacros != null) "БЖУ · мои нормы" else "БЖУ",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onEditMacros) {
+                    Icon(Icons.Filled.Edit, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Изменить")
+                }
+            }
             val goals = state.macroGoals
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 MacroBar("Углеводы", state.totalCarbs, goals.carbs, macroColor(Macro.CARBS), Modifier.weight(1f))
@@ -705,4 +735,44 @@ private fun SpeedDialItem(label: String, icon: ImageVector, onClick: () -> Unit)
             Icon(icon, contentDescription = label)
         }
     }
+}
+
+/** Lets the user type daily macro goals in grams; shows the calories they add up to. */
+@Composable
+private fun MacroGoalsDialog(state: DiaryUiState, onDismiss: () -> Unit, onSave: (MacroGrams?, Boolean) -> Unit) {
+    val current = state.macroGoals
+    var p by remember { mutableStateOf(current.protein.roundToInt().toString()) }
+    var f by remember { mutableStateOf(current.fat.roundToInt().toString()) }
+    var c by remember { mutableStateOf(current.carbs.roundToInt().toString()) }
+    var alsoCalories by remember { mutableStateOf(true) }
+    val grams = listOf(p, f, c).map { it.replace(',', '.').toDoubleOrNull() }
+    val valid = grams.all { it != null && it >= 0 }
+    val kcal = if (valid) MacroGrams(grams[0]!!, grams[1]!!, grams[2]!!).calories else 0.0
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Мои нормы БЖУ") },
+        text = {
+            Column {
+                Text("Граммы в день. Калории посчитаются сами: белки и углеводы по 4 ккал, жиры по 9.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+                val kb = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                OutlinedTextField(p, { p = it }, label = { Text("Белки, г") }, singleLine = true, keyboardOptions = kb)
+                OutlinedTextField(f, { f = it }, label = { Text("Жиры, г") }, singleLine = true, keyboardOptions = kb)
+                OutlinedTextField(c, { c = it }, label = { Text("Углеводы, г") }, singleLine = true, keyboardOptions = kb)
+                Spacer(Modifier.height(12.dp))
+                Text("= ${kcal.roundToInt()} ккал", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = alsoCalories, onCheckedChange = { alsoCalories = it })
+                    Text("Сделать это целью по калориям (сейчас ${state.dailyGoal.roundToInt()})", style = MaterialTheme.typography.bodyMedium)
+                }
+                if (state.customMacros != null) {
+                    TextButton(onClick = { onSave(null, false) }) { Text("Сбросить — считать автоматически") }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = valid && kcal > 0, onClick = { onSave(MacroGrams(grams[0]!!, grams[1]!!, grams[2]!!), alsoCalories) }) { Text("Сохранить") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
 }

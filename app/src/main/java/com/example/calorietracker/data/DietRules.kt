@@ -7,6 +7,11 @@ data class MacroSplit(val protein: Int, val fat: Int, val carbs: Int) {
     }
 }
 
+/** Macro goals the user typed in by hand, grams per day; they override diet/auto goals. */
+data class MacroGrams(val protein: Double, val fat: Double, val carbs: Double) {
+    val calories: Double get() = protein * 4 + fat * 9 + carbs * 4
+}
+
 val Diet.split: MacroSplit get() = MacroSplit(proteinPct, fatPct, carbsPct)
 
 /**

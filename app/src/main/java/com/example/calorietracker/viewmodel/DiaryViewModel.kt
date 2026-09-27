@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import android.net.Uri
 import com.example.calorietracker.data.Calc
 import com.example.calorietracker.data.DayTotals
+import com.example.calorietracker.data.MacroGrams
 import com.example.calorietracker.data.MacroSplit
+import kotlin.math.roundToInt
 import com.example.calorietracker.data.DiaryEntry
 import com.example.calorietracker.data.MealPhoto
 import com.example.calorietracker.data.MealType
@@ -39,11 +41,13 @@ val MealType.goalShare: Double
 /** Macro goals in grams from the calorie goal and a split (the active diet's, or 20/30/50). */
 data class MacroGoals(val protein: Double, val fat: Double, val carbs: Double) {
     companion object {
-        fun fromCalories(goal: Double, split: MacroSplit = MacroSplit.DEFAULT) = MacroGoals(
-            protein = goal * split.protein / 100.0 / 4.0,
-            fat = goal * split.fat / 100.0 / 9.0,
-            carbs = goal * split.carbs / 100.0 / 4.0
-        )
+        fun fromCalories(goal: Double, split: MacroSplit = MacroSplit.DEFAULT, custom: MacroGrams? = null) =
+            if (custom != null) MacroGoals(custom.protein, custom.fat, custom.carbs)
+            else MacroGoals(
+                protein = goal * split.protein / 100.0 / 4.0,
+                fat = goal * split.fat / 100.0 / 9.0,
+                carbs = goal * split.carbs / 100.0 / 4.0
+            )
     }
 }
 
@@ -52,6 +56,7 @@ data class DiaryUiState(
     val entries: List<DiaryEntry> = emptyList(),
     val dailyGoal: Double = 2000.0,
     val split: MacroSplit = MacroSplit.DEFAULT,
+    val customMacros: MacroGrams? = null,
     val dietName: String? = null,
     val streak: Int = 0,
     /** Calories per day for the week around [epochDay] (Mon..Sun), for the week strip. */
@@ -62,7 +67,7 @@ data class DiaryUiState(
     val totalFat: Double get() = entries.sumOf { it.fat }
     val totalCarbs: Double get() = entries.sumOf { it.carbs }
     val remaining: Double get() = dailyGoal - totalCalories
-    val macroGoals: MacroGoals get() = MacroGoals.fromCalories(dailyGoal, split)
+    val macroGoals: MacroGoals get() = MacroGoals.fromCalories(dailyGoal, split, customMacros)
 
     fun caloriesFor(meal: MealType): Double = entries.filter { it.mealType == meal }.sumOf { it.calories }
 }
@@ -85,13 +90,13 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
             combine(
                 diaryRepo.entriesForDay(day),
                 settingsRepo.dailyGoal,
-                combine(settingsRepo.macroSplit, activeDiet) { split, diet -> split to diet?.name },
+                combine(settingsRepo.macroSplit, activeDiet, settingsRepo.macroGrams) { split, diet, custom -> Triple(split, diet?.name, custom) },
                 diaryRepo.daysWithEntries(),
                 diaryRepo.dailyTotals(monday, monday + 6)
-            ) { entries, goal, (split, dietName), days, week ->
+            ) { entries, goal, (split, dietName, custom), days, week ->
                 val byDay = week.associateBy { it.epochDay }
                 DiaryUiState(
-                    epochDay = day, entries = entries, dailyGoal = goal, split = split, dietName = dietName,
+                    epochDay = day, entries = entries, dailyGoal = goal, split = split, customMacros = custom, dietName = dietName,
                     streak = streakOf(days, LocalDate.now().toEpochDay()),
                     week = (monday..monday + 6).map { byDay[it] ?: DayTotals(it, 0.0, 0.0, 0.0, 0.0) }
                 )
@@ -134,6 +139,14 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
 
     fun shiftDay(delta: Long) {
         selectedEpochDay.value += delta
+    }
+
+    /** Saves hand-entered macro goals; optionally makes their calories the daily goal. Null resets to auto. */
+    fun setCustomMacros(value: MacroGrams?, alsoCalories: Boolean) {
+        viewModelScope.launch {
+            settingsRepo.setMacroGrams(value)
+            if (value != null && alsoCalories) settingsRepo.setDailyGoal((value.calories / 10).roundToInt() * 10.0)
+        }
     }
 
     fun selectDay(epochDay: Long) {

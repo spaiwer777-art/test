@@ -21,23 +21,20 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Optional: with these secrets set, every build is signed with the same
-      # key and installs over the previous one. Without them the APK is signed
-      # with a throwaway debug key.
-      - name: Decode signing key
-        env:
-          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-        if: env.SIGNING_KEYSTORE_BASE64 != ''
-        run: |
-          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-
       - name: Build release APK
         env:
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          # Permanent key: app/release.keystore (created by the "Create signing key"
+          # workflow) unlocked with this secret. Without it the APK uses a throwaway key.
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: ./gradlew assembleRelease
+
+      - name: Check signature
+        run: |
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | tail -1)
+          $APKSIGNER verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E "certificate DN|SHA-256" | head -2
+          if [ -f app/release.keystore ] && [ -n "$SIGNING_PASSWORD_SET" ]; then echo "PERMANENT_KEY=yes" >> "$GITHUB_ENV"; else echo "PERMANENT_KEY=no" >> "$GITHUB_ENV"; fi
+        env:
+          SIGNING_PASSWORD_SET: ${{ secrets.SIGNING_PASSWORD != '' }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -49,9 +46,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          VERSION="1.1.${{ github.run_number }}"
           TAG="build-${{ github.run_number }}"
           cp app/build/outputs/apk/release/app-release.apk CalorieTracker.apk
-          gh release create "$TAG" CalorieTracker.apk \
-            --target "$GITHUB_SHA" \
-            --title "CalorieTracker 1.0.${{ github.run_number }}" \
-            --notes "Автосборка из ветки \`${GITHUB_REF_NAME}\`, коммит ${GITHUB_SHA::7}."
+          cp app/build/outputs/apk/release/app-release.apk "CalorieTracker-$VERSION.apk"
+          {
+            echo "## CalorieTracker $VERSION"
+            echo
+            cat RELEASE_NOTES.md
+            echo
+            if [ "$PERMANENT_KEY" = "yes" ]; then
+              echo "🔐 Подписано постоянным ключом: обновления ставятся поверх, данные сохраняются."
+            else
+              echo "⚠️ Временный ключ подписи: перед установкой удали прошлую версию (сначала сохрани резервную копию)."
+            fi
+            echo
+            echo "Коммит ${GITHUB_SHA::7}, ветка \`${GITHUB_REF_NAME}\`."
+          } > notes.md
+          gh release create "$TAG" CalorieTracker.apk "CalorieTracker-$VERSION.apk" \
+            --target "$GITHUB_SHA" --title "CalorieTracker $VERSION" --notes-file notes.md --latest

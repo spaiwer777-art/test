@@ -76,6 +76,7 @@ fun AccountScreen(onBack: () -> Unit) {
     var confirm by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
     var includePhotos by remember { mutableStateOf(true) }
     val busy = status is AccountStatus.Busy
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         uri?.let { vm.exportTo(it, includePhotos) }
@@ -125,6 +126,16 @@ fun AccountScreen(onBack: () -> Unit) {
                 }
             } else if (current == null) {
                 SectionCard(title = "Вход", subtitle = "Аккаунт хранит дневник, рецепты, диеты, вес и настройки в облаке") {
+                    if (vm.googleEnabled) {
+                        FilledTonalButton(onClick = { vm.signInWithGoogle(context) }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                            Text("G", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(10.dp))
+                            Text("Войти через Google")
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text("или по почте", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        Spacer(Modifier.height(8.dp))
+                    }
                     OutlinedTextField(
                         email, { email = it }, label = { Text("Email") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth()

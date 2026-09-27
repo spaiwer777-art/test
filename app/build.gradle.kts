@@ -19,7 +19,7 @@ android {
         // CI bumps these on every build so each APK installs as an update.
         val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toInt() ?: 1
         versionCode = buildNumber
-        versionName = "1.0.$buildNumber"
+        versionName = "1.1.$buildNumber"
 
         // Supabase project for accounts and cloud backup (public URL and anon key,
         // protected by row-level security). From supabase.properties or env; empty = cloud off.
@@ -29,23 +29,23 @@ android {
         fun cfg(key: String, env: String) = (supabase.getProperty(key) ?: System.getenv(env) ?: "").trim()
         buildConfigField("String", "SUPABASE_URL", "\"${cfg("url", "SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${cfg("anonKey", "SUPABASE_ANON_KEY")}\"")
+        // Web OAuth client id from Google Cloud, enables "Sign in with Google"; empty = button hidden.
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${cfg("googleWebClientId", "GOOGLE_WEB_CLIENT_ID")}\"")
     }
 
     signingConfigs {
-        // Stable release key, provided by CI from GitHub Secrets (never committed).
-        val keystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
-        if (keystorePath != null) {
+        // Permanent release key: app/release.keystore (created once by the "Create signing key"
+        // workflow) unlocked by SIGNING_STORE_PASSWORD from GitHub Secrets. Never committed in plain text.
+        val keystore = file("release.keystore")
+        val password = System.getenv("SIGNING_STORE_PASSWORD").orEmpty()
+        if (keystore.exists() && password.isNotEmpty()) {
             create("release") {
-                storeFile = file(keystorePath)
-                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
-                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+                storeFile = keystore
+                storePassword = password
+                keyAlias = "calorietracker"
+                keyPassword = password
             }
         }
-    }
-
-    ksp {
-        arg("room.schemaLocation", "$projectDir/schemas")
     }
 
     buildTypes {
@@ -116,6 +116,11 @@ dependencies {
     // Meal photos: image loading and EXIF rotation
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+
+    // Sign in with Google (Credential Manager)
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // Local key-value storage for settings (API key, daily goal)
     implementation("androidx.datastore:datastore-preferences:1.1.1")

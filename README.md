@@ -90,6 +90,22 @@ ANDROID_HOME=/путь/к/sdk ./gradlew testDebugUnitTest       # все тес�
    - `SIGNING_KEY_ALIAS` — `calorietracker`
 3. Сам `release.jks` хранить у себя (не в репозитории) — он же понадобится для Google Play.
 
+## Постоянный ключ подписи (обновления без удаления)
+Один раз:
+1. GitHub → Settings → Secrets and variables → Actions → **New repository secret**:
+   имя `SIGNING_PASSWORD`, значение — придуманный длинный пароль (от 12 символов). Сохрани его у себя.
+2. Actions → **Create signing key** → Run workflow. Он создаст `app/release.keystore`
+   (зашифрован этим паролем) и закоммитит его; в логе будут отпечатки SHA-1/SHA-256 для входа через Google.
+3. Все следующие сборки подписываются этим ключом — новые версии ставятся поверх старых.
+
+## Вход через Google
+Нужны Supabase (см. выше) и Google Cloud:
+1. console.cloud.google.com → APIs & Services → OAuth consent screen (External) → заполнить название
+2. Credentials → Create OAuth client ID → **Web application** → скопировать Client ID
+3. Credentials → Create OAuth client ID → **Android**: пакет `com.example.calorietracker`, SHA-1 из шага про ключ подписи
+4. Supabase → Authentication → Providers → Google → включить, вставить Web Client ID и secret
+5. В `supabase.properties` добавить `googleWebClientId=<Web Client ID>`
+
 ## Установка на телефон
 1. Скачать `app-debug.apk` на телефон
 2. Открыть файл и разрешить «Установку из неизвестных источников» для браузера/файлового менеджера

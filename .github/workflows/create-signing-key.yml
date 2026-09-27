@@ -1,0 +1,52 @@
+name: Create signing key
+
+# One-time: generates the app's permanent release key inside GitHub Actions,
+# protected by the SIGNING_PASSWORD secret, and commits the (encrypted) keystore.
+# The password never appears in the repository or the logs.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Generate keystore
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_PASSWORD" ]; then
+            echo "::error::Add the SIGNING_PASSWORD secret first (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          if [ ${#SIGNING_PASSWORD} -lt 12 ]; then
+            echo "::error::SIGNING_PASSWORD must be at least 12 characters."
+            exit 1
+          fi
+          if [ -f app/release.keystore ]; then
+            echo "::error::app/release.keystore already exists; delete it first if you really want a new key (existing installs won't update)."
+            exit 1
+          fi
+          keytool -genkeypair -keystore app/release.keystore -storetype PKCS12 \
+            -storepass "$SIGNING_PASSWORD" -keypass "$SIGNING_PASSWORD" \
+            -alias calorietracker -keyalg RSA -keysize 4096 -validity 36500 \
+            -dname "CN=CalorieTracker"
+          echo "SHA-1 / SHA-256 fingerprints (needed for Google sign-in):"
+          keytool -list -v -keystore app/release.keystore -storepass "$SIGNING_PASSWORD" | grep -E "SHA1|SHA256"
+
+      - name: Commit keystore
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/release.keystore
+          git commit -m "Add release keystore (encrypted with SIGNING_PASSWORD)"
+          git push

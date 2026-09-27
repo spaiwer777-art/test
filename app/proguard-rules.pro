@@ -24,3 +24,8 @@
 -keep class com.example.calorietracker.data.MealPlanEntity { *; }
 -keep class com.example.calorietracker.data.MealPhoto { *; }
 -keep enum com.example.calorietracker.data.** { *; }
+
+# Credential Manager / Sign in with Google
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** { *; }
+-keep class com.google.android.libraries.identity.googleid.** { *; }

@@ -52,6 +52,15 @@ class CloudSync {
             addProperty("email", email); addProperty("password", password)
         }))
 
+    /** Exchanges a Google ID token (with the raw nonce whose hash Google signed) for a Supabase session. */
+    suspend fun signInWithGoogle(idToken: String, rawNonce: String): CloudSession =
+        session(call("POST", "/auth/v1/token?grant_type=id_token", null, JsonObject().apply {
+            addProperty("provider", "google"); addProperty("id_token", idToken); addProperty("nonce", rawNonce)
+        }))
+
+    val googleClientId: String get() = BuildConfig.GOOGLE_WEB_CLIENT_ID
+    val googleEnabled: Boolean get() = isConfigured && googleClientId.isNotBlank()
+
     suspend fun refresh(s: CloudSession): CloudSession =
         session(call("POST", "/auth/v1/token?grant_type=refresh_token", null, JsonObject().apply {
             addProperty("refresh_token", s.refreshToken)

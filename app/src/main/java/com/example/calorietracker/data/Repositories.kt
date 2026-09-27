@@ -47,7 +47,12 @@ class FoodRepository(private val db: AppDatabase) {
 
     /** Looks up a barcode on Open Food Facts and saves it locally, or returns null if not found. */
     suspend fun lookupBarcodeOnline(barcode: String): Food? {
-        val response = NetworkModule.openFoodFactsApi.getProduct(barcode)
+        // Open Food Facts answers 404 for barcodes it doesn't know: that's "not found", not an error.
+        val response = try {
+            NetworkModule.openFoodFactsApi.getProduct(barcode)
+        } catch (e: HttpException) {
+            if (e.code() == 404) return null else throw e
+        }
         if (response.status != 1) return null
         val food = response.product?.toFood(FoodSource.BARCODE, fallbackName = "Продукт $barcode") ?: return null
         val id = db.foodDao().insert(food.copy(barcode = barcode))
@@ -56,7 +61,11 @@ class FoodRepository(private val db: AppDatabase) {
 
     /** Full-text search on Open Food Facts; results are not saved until the user opens one. */
     suspend fun searchOnline(query: String): List<Food> =
-        NetworkModule.offSearchApi.search(query).hits.orEmpty()
+        try {
+            NetworkModule.offSearchApi.search(query).hits.orEmpty()
+        } catch (e: HttpException) {
+            if (e.code() == 404) emptyList() else throw e
+        }
             .mapNotNull { it.toFood(FoodSource.ONLINE, fallbackName = null) }
             .distinctBy { it.barcode ?: it.name }
 
