@@ -165,7 +165,7 @@ class ScreenshotTest {
         }
     }
 
-    @Test fun searchToolsLargeFont() = themed(dark = true, fontScale = 1.3f) {
+    @Test fun searchToolsLargeFont() = themed(dark = true, fontScale = 1.3f, narrow = true) {
         androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(16.dp)) {
             SearchTools(com.example.calorietracker.viewmodel.SearchFilter.RU, {}, {}, {}, {})
         }
@@ -245,13 +245,16 @@ class ScreenshotTest {
         accent: AccentColor = AccentColor.GREEN,
         tall: Boolean = false,
         fontScale: Float = 1f,
+        /** Like a phone with display size set to "large": fewer dp across. */
+        narrow: Boolean = false,
         content: @androidx.compose.runtime.Composable () -> Unit
     ) {
         paparazzi.unsafeUpdateConfig(
             deviceConfig = DeviceConfig.PIXEL_6.copy(
                 nightMode = if (dark) NightMode.NIGHT else NightMode.NOTNIGHT,
                 screenHeight = if (tall) 6000 else DeviceConfig.PIXEL_6.screenHeight,
-                fontScale = fontScale
+                fontScale = fontScale,
+                density = if (narrow) com.android.resources.Density.create(520) else DeviceConfig.PIXEL_6.density
             )
         )
         paparazzi.snapshot {

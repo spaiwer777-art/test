@@ -17,6 +17,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -138,4 +144,28 @@ fun NumberField(
             focused = state.isFocused
         }
     )
+}
+
+/**
+ * Single-line text that shrinks its font to fit the width it gets (large system fonts, narrow
+ * segments). A plain Layout, so parents that ask for intrinsic sizes (segmented buttons) work.
+ */
+@Composable
+fun FitText(text: String, style: TextStyle, modifier: Modifier = Modifier, minSizeSp: Float = 8f) {
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val color = style.color.takeOrElse { androidx.compose.material3.LocalContentColor.current }
+    val holder = remember { arrayOfNulls<androidx.compose.ui.text.TextLayoutResult>(1) }
+    androidx.compose.ui.layout.Layout(
+        content = {},
+        modifier = modifier.semantics { contentDescription = text }
+            .drawBehind { holder[0]?.let { drawText(it, color = color) } }
+    ) { _, c ->
+        var r = measurer.measure(text, style, maxLines = 1, softWrap = false)
+        if (c.hasBoundedWidth && r.size.width > c.maxWidth && r.size.width > 0) {
+            val size = maxOf(style.fontSize.value * c.maxWidth / r.size.width * 0.97f, minSizeSp)
+            r = measurer.measure(text, style.copy(fontSize = size.sp), maxLines = 1, softWrap = false)
+        }
+        holder[0] = r
+        layout(minOf(r.size.width, if (c.hasBoundedWidth) c.maxWidth else r.size.width), r.size.height) {}
+    }
 }

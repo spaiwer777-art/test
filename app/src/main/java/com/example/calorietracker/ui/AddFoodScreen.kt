@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -49,17 +51,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.calorietracker.data.Food
 import com.example.calorietracker.data.FoodSource
@@ -134,6 +136,27 @@ fun AddFoodScreen(
             section("Мои продукты", mine, "m")
             section("Базовые продукты", ru, "r")
             section("Мировые · USDA", usda, "u")
+
+            if (query.isBlank() && filter == SearchFilter.OFF) {
+                item {
+                    EmptyHint(
+                        Icons.Filled.Storefront,
+                        "Найди товар из магазина",
+                        "Напиши название с упаковки, например «творог Простоквашино», или отсканируй штрихкод.",
+                        "Сканировать штрихкод", Icons.Filled.QrCodeScanner, onScan
+                    )
+                }
+            }
+            if (query.isBlank() && filter == SearchFilter.MINE && results.isEmpty()) {
+                item {
+                    EmptyHint(
+                        Icons.Filled.Inventory2,
+                        "Здесь будут твои продукты",
+                        "Всё, что добавишь вручную, по штрихкоду или из интернета, появится тут — для быстрого повтора.",
+                        "Добавить вручную", Icons.Filled.Add
+                    ) { showManualDialog = true }
+                }
+            }
 
             if (filter.sources.isNotEmpty() && results.isEmpty() && query.isNotBlank()) {
                 item { Text("В офлайн-базах ничего не нашлось.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp)) }
@@ -267,7 +290,13 @@ private fun ManualFoodDialog(
 
 /** One of three equal quick actions above the search results. */
 @Composable
-private fun ActionTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, modifier: Modifier, onClick: () -> Unit) {
+private fun ActionTile(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
     androidx.compose.material3.Surface(
         onClick = onClick,
         modifier = modifier.height(84.dp),
@@ -286,9 +315,19 @@ private fun ActionTile(icon: androidx.compose.ui.graphics.vector.ImageVector, la
                 contentAlignment = Alignment.Center
             ) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }
             Spacer(Modifier.height(6.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            Text(label, style = style, maxLines = 1, softWrap = false)
         }
     }
+}
+
+/** Font size that lets the longest of [labels] fit into [width]: one size for the whole group, so it stays even. */
+@Composable
+private fun groupFontSize(labels: List<String>, style: androidx.compose.ui.text.TextStyle, width: androidx.compose.ui.unit.Dp): androidx.compose.ui.text.TextStyle {
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val px = with(androidx.compose.ui.platform.LocalDensity.current) { width.roundToPx() }
+    val widest = labels.maxOf { measurer.measure(it, style, maxLines = 1, softWrap = false).size.width }
+    return if (widest <= px || widest == 0) style
+    else style.copy(fontSize = (style.fontSize.value * px / widest * 0.97f).sp)
 }
 
 /** Quick actions (barcode, AI, manual) and the source switch with a one-line explanation. */
@@ -300,36 +339,93 @@ internal fun SearchTools(
     onAi: () -> Unit,
     onManual: () -> Unit
 ) {
-    Column {
-        Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ActionTile(Icons.Filled.QrCodeScanner, "Штрихкод", Modifier.weight(1f), onScan)
-            ActionTile(Icons.Filled.AutoAwesome, "Описать ИИ", Modifier.weight(1f), onAi)
-            ActionTile(Icons.Filled.Add, "Вручную", Modifier.weight(1f), onManual)
-        }
-        Spacer(Modifier.height(12.dp))
-        // Five equal segments: cap the system font scale so labels never get clipped on large-font phones.
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, minOf(density.fontScale, 1f))
-        ) {
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                SearchFilter.entries.forEachIndexed { i, f ->
-                    SegmentedButton(
-                        selected = filter == f,
-                        onClick = { onFilter(f) },
-                        shape = SegmentedButtonDefaults.itemShape(i, SearchFilter.entries.size),
-                        icon = {}
-                    ) { Text(f.label, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false) }
-                }
+    androidx.compose.foundation.layout.BoxWithConstraints {
+        val tileStyle = groupFontSize(
+            listOf("Штрихкод", "Описать ИИ", "Вручную"), MaterialTheme.typography.labelLarge, (maxWidth - 20.dp) / 3 - 16.dp
+        )
+        val segmentStyle = groupFontSize(
+            SearchFilter.entries.map { it.label }, MaterialTheme.typography.labelLarge, maxWidth / SearchFilter.entries.size - 10.dp
+        )
+        Column {
+            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ActionTile(Icons.Filled.QrCodeScanner, "Штрихкод", tileStyle, Modifier.weight(1f), onScan)
+                ActionTile(Icons.Filled.AutoAwesome, "Описать ИИ", tileStyle, Modifier.weight(1f), onAi)
+                ActionTile(Icons.Filled.Add, "Вручную", tileStyle, Modifier.weight(1f), onManual)
+            }
+            Spacer(Modifier.height(12.dp))
+            SourceSwitch(filter, onFilter, segmentStyle)
+            AnimatedContent(filter, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "hint") { f ->
+                Text(
+                    f.hint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp)
+                )
             }
         }
-        AnimatedContent(filter, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "hint") { f ->
-            Text(
-                f.hint,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp)
+    }
+}
+
+/** Friendly placeholder instead of an empty list, with one obvious next step. */
+@Composable
+private fun EmptyHint(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    text: String,
+    action: String,
+    actionIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    onAction: () -> Unit
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        androidx.compose.foundation.layout.Box(
+            Modifier.size(72.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) { Icon(icon, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(36.dp)) }
+        Spacer(Modifier.height(16.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        Spacer(Modifier.height(16.dp))
+        androidx.compose.material3.FilledTonalButton(onClick = onAction) {
+            Icon(actionIcon, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(action)
+        }
+    }
+}
+
+/** Five equal segments in one pill; tight padding so labels stay readable on narrow, large-font screens. */
+@Composable
+private fun SourceSwitch(filter: SearchFilter, onFilter: (SearchFilter) -> Unit, style: androidx.compose.ui.text.TextStyle) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
+    Row(
+        Modifier.fillMaxWidth().height(44.dp).clip(shape)
+            .border(1.dp, scheme.outline, shape)
+    ) {
+        SearchFilter.entries.forEachIndexed { i, f ->
+            if (i > 0) androidx.compose.foundation.layout.Box(Modifier.width(1.dp).fillMaxHeight().background(scheme.outline))
+            val selected = f == filter
+            val bg by androidx.compose.animation.animateColorAsState(
+                if (selected) scheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent, label = "seg"
             )
+            androidx.compose.foundation.layout.Box(
+                Modifier.weight(1f).fillMaxHeight().background(bg)
+                    .clickable(role = androidx.compose.ui.semantics.Role.Tab) { onFilter(f) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    f.label, style = style, maxLines = 1, softWrap = false,
+                    color = if (selected) scheme.onSecondaryContainer else scheme.onSurface
+                )
+            }
         }
     }
 }
