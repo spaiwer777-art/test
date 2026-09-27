@@ -35,6 +35,8 @@ enum class WeightGoal(val factor: Double, val label: String) {
     GAIN(1.10, "Набрать массу")
 }
 
+fun cleanApiKey(value: String): String = value.filterNot { it.isWhitespace() }
+
 /** Body data used by calculators and the meal planner. */
 data class Profile(
     val sex: Sex = Sex.MALE,
@@ -95,7 +97,8 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { it[calorieAutoKey] = value }
     }
 
-    val groqApiKey: Flow<String> = context.dataStore.data.map { it[groqApiKeyKey] ?: "" }
+    /** Whitespace is never part of a Groq key; pasted keys often carry a stray space or line break. */
+    val groqApiKey: Flow<String> = context.dataStore.data.map { cleanApiKey(it[groqApiKeyKey] ?: "") }
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         prefs[themeModeKey]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM
     }
@@ -222,7 +225,7 @@ class SettingsRepository(private val context: Context) {
     }
 
     suspend fun setGroqApiKey(value: String) {
-        context.dataStore.edit { it[groqApiKeyKey] = value.trim() }
+        context.dataStore.edit { it[groqApiKeyKey] = cleanApiKey(value) }
     }
 
     suspend fun setThemeMode(value: ThemeMode) {

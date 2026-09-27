@@ -25,7 +25,8 @@ sealed class AiState {
 /** Human-readable message for a failed Groq call. */
 fun aiErrorMessage(e: Exception): String = when (e) {
     is HttpException -> when (e.code()) {
-        401 -> "Groq не принял API-ключ. Проверь ключ в настройках."
+        401 -> "Groq не принял API-ключ. Скопируй его заново целиком с console.groq.com и вставь в Настройках."
+        403 -> "Groq закрыт для твоей сети или страны (ошибка 403). Включи VPN и попробуй снова."
         413 -> "Запрос слишком большой для лимитов Groq. Сократи его."
         429 -> "Достигнут лимит бесплатного Groq. Подожди минуту (или до завтра, если исчерпан дневной лимит)."
         else -> "Сервер Groq ответил ошибкой ${e.code()}. Попробуй позже."

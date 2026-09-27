@@ -89,4 +89,9 @@ class LogicTest {
         assertTrue(search("фарш свино говяжий").contains("Фарш свино-говяжий"))
         assertTrue(search("огурцы соленые").isNotEmpty())
     }
+
+    @Test
+    fun apiKeyLosesPastedWhitespace() {
+        assertEquals("gsk_abcDEF123", cleanApiKey(" gsk_abc DEF\n123 "))
+    }
 }

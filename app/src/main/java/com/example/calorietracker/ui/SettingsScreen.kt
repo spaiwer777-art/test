@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -84,7 +85,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenProfile: () -> Unit) {
     val appName by vm.appName.collectAsState()
 
     var apiKeyText by remember(apiKey) { mutableStateOf(apiKey) }
-    var keySaved by remember { mutableStateOf(false) }
+    val keyCheck by vm.keyCheck.collectAsState()
+    val checking by vm.checking.collectAsState()
 
     Scaffold(
         topBar = {
@@ -184,16 +186,33 @@ fun SettingsScreen(onBack: () -> Unit, onOpenProfile: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 AppTextField(
                     value = apiKeyText,
-                    onValueChange = { apiKeyText = it },
+                    onValueChange = { apiKeyText = com.example.calorietracker.data.cleanApiKey(it) },
                     label = { Text("Groq API-ключ") },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(12.dp))
-                SaveRow("Сохранить ключ", keySaved, onSaved = { keySaved = false }) {
-                    vm.setGroqApiKey(apiKeyText)
-                    keySaved = true
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = { vm.checkGroqKey(apiKeyText) }, enabled = !checking) {
+                        if (checking) androidx.compose.material3.CircularProgressIndicator(
+                            Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary
+                        ) else Text("Сохранить и проверить")
+                    }
+                }
+                keyCheck?.let { (ok, text) ->
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (ok) Icons.Filled.CheckCircle else Icons.Filled.ErrorOutline, null,
+                            tint = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text, style = MaterialTheme.typography.bodyMedium,
+                            color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -213,28 +232,6 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(12.dp))
             content()
-        }
-    }
-}
-
-/** Save button with a short animated "Сохранено" confirmation next to it. */
-@Composable
-private fun SaveRow(label: String, saved: Boolean, onSaved: () -> Unit, onClick: () -> Unit) {
-    LaunchedEffect(saved) {
-        if (saved) {
-            delay(1800)
-            onSaved()
-        }
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Button(onClick = onClick) { Text(label) }
-        Spacer(Modifier.width(12.dp))
-        AnimatedVisibility(saved, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(4.dp))
-                Text("Сохранено", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            }
         }
     }
 }

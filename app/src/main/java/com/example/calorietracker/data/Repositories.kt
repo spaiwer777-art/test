@@ -241,6 +241,10 @@ class AiRepository(private val foodRepo: FoodRepository) {
         )
     }
 
+    /** Cheap call that tells whether Groq accepts [apiKey] from this network. Throws like any AI call. */
+    suspend fun checkKey(apiKey: String): Int =
+        NetworkModule.groqApi.listModels("Bearer " + cleanApiKey(apiKey)).data.size
+
     private suspend fun chat(apiKey: String, system: String, user: String, reasoning: String, maxTokens: Int): String {
         val bearer = "Bearer $apiKey"
         val messages = listOf(ChatMessage("system", system), ChatMessage("user", user))

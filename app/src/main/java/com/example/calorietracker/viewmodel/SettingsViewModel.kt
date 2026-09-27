@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.calorietracker.data.AccentColor
 import com.example.calorietracker.data.SettingsRepository
 import com.example.calorietracker.data.ThemeMode
+import com.example.calorietracker.graph
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -45,6 +46,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setGroqApiKey(value: String) {
         viewModelScope.launch { repo.setGroqApiKey(value) }
+    }
+
+    /** null = not checked yet; true/false with a message after «Проверить». */
+    private val _keyCheck = kotlinx.coroutines.flow.MutableStateFlow<Pair<Boolean, String>?>(null)
+    val keyCheck: StateFlow<Pair<Boolean, String>?> = _keyCheck
+    private val _checking = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val checking: StateFlow<Boolean> = _checking
+
+    fun checkGroqKey(value: String) {
+        val key = com.example.calorietracker.data.cleanApiKey(value)
+        if (key.isEmpty()) { _keyCheck.value = false to "Сначала вставь ключ."; return }
+        viewModelScope.launch {
+            _checking.value = true
+            repo.setGroqApiKey(key)
+            _keyCheck.value = try {
+                getApplication<Application>().graph.ai.checkKey(key)
+                true to "Ключ работает — ИИ готов."
+            } catch (e: Exception) {
+                false to aiErrorMessage(e)
+            }
+            _checking.value = false
+        }
     }
 
     fun setThemeMode(value: ThemeMode) {
