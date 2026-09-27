@@ -12,13 +12,32 @@ android {
         applicationId = "com.example.calorietracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // CI bumps these on every build so each APK installs as an update.
+        val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toInt() ?: 1
+        versionCode = buildNumber
+        versionName = "1.0.$buildNumber"
+    }
+
+    signingConfigs {
+        // Stable release key, provided by CI from GitHub Secrets (never committed).
+        val keystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // Without the release key (local builds, or CI before secrets are set)
+            // fall back to the debug key so the APK still installs on a phone.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

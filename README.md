@@ -24,8 +24,19 @@
 ```
 
 Через GitHub Actions (без установки чего-либо): при каждом пуше workflow `Build APK`
-собирает приложение. Готовый APK — во вкладке **Actions** → нужный запуск → раздел
-**Artifacts** → `CalorieTracker-debug-apk`.
+собирает release-APK (сжатый R8) и публикует его в **Releases** репозитория.
+Последняя версия всегда по ссылке:
+`https://github.com/spaiwer777-art/test/releases/latest/download/CalorieTracker.apk`
+
+### Постоянный ключ подписи (чтобы обновления ставились поверх)
+Без него каждая CI-сборка подписана новым одноразовым ключом, и перед установкой
+новой версии старую придётся удалить (вместе с дневником). Один раз:
+1. Создать ключ: `keytool -genkeypair -keystore release.jks -alias calorietracker -keyalg RSA -keysize 2048 -validity 10000`
+2. В репозитории: Settings → Secrets and variables → Actions → New repository secret:
+   - `SIGNING_KEYSTORE_BASE64` — вывод `base64 -w0 release.jks`
+   - `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_PASSWORD` — пароли из шага 1
+   - `SIGNING_KEY_ALIAS` — `calorietracker`
+3. Сам `release.jks` хранить у себя (не в репозитории) — он же понадобится для Google Play.
 
 ## Установка на телефон
 1. Скачать `app-debug.apk` на телефон

@@ -5,6 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,10 +21,37 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      # Optional: with these secrets set, every build is signed with the same
+      # key and installs over the previous one. Without them the APK is signed
+      # with a throwaway debug key.
+      - name: Decode signing key
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        if: env.SIGNING_KEYSTORE_BASE64 != ''
+        run: |
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CalorieTracker-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: CalorieTracker-apk
+          path: app/build/outputs/apk/release/app-release.apk
+
+      - name: Publish GitHub Release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk CalorieTracker.apk
+          gh release create "$TAG" CalorieTracker.apk \
+            --target "$GITHUB_SHA" \
+            --title "CalorieTracker 1.0.${{ github.run_number }}" \
+            --notes "Автосборка из ветки \`${GITHUB_REF_NAME}\`, коммит ${GITHUB_SHA::7}."
