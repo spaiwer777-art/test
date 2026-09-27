@@ -173,7 +173,7 @@ fun AccountScreen(onBack: () -> Unit) {
                     }
                     Spacer(Modifier.height(8.dp))
                     FilledTonalButton(
-                        onClick = { confirm = "Данные на этом телефоне будут заменены данными из облака." to vm::download },
+                        onClick = { confirm = "Данные на этом телефоне будут заменены данными из облака." to { vm.download() } },
                         enabled = !busy, modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Filled.CloudDownload, null); Spacer(Modifier.width(8.dp)); Text("Загрузить из облака")

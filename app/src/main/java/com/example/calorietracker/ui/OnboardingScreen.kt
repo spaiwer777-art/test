@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,11 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -54,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -61,13 +57,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.calorietracker.R
 import com.example.calorietracker.data.ActivityLevel
 import com.example.calorietracker.data.Diet
 import com.example.calorietracker.data.Profile
@@ -78,29 +72,62 @@ import com.example.calorietracker.ui.components.AnimatedNumber
 import com.example.calorietracker.ui.components.MacroDonut
 import com.example.calorietracker.ui.components.formatGrams
 import com.example.calorietracker.ui.components.toNumberOrNull
+import com.example.calorietracker.viewmodel.AccountViewModel
 import com.example.calorietracker.viewmodel.MacroGoals
 import com.example.calorietracker.viewmodel.OnboardingViewModel
 import kotlin.math.roundToInt
 
-private const val STEPS = 4
+private const val STEPS = 3
 
+/** Account first (sign up / sign in / skip), then the profile questions. */
 @Composable
 fun OnboardingScreen(onDone: () -> Unit, onRestore: () -> Unit) {
     val vm: OnboardingViewModel = viewModel()
+    val account: AccountViewModel = viewModel()
     val profile by vm.profile.collectAsState()
     val dietId by vm.dietId.collectAsState()
     val diets by vm.diets.collectAsState()
-    OnboardingContent(
-        profile = profile,
-        onProfile = { vm.profile.value = it },
-        diets = diets,
-        dietId = dietId,
-        onDiet = { vm.dietId.value = it },
-        calories = vm.calories(),
-        onFinish = { vm.finish(onDone) },
-        onSkip = { vm.skip(onDone) },
-        onRestore = { vm.skip(onRestore) }
-    )
+    val session by account.session.collectAsState()
+    val status by account.status.collectAsState()
+    val hasCloudData by account.cloudHasData.collectAsState()
+    val context = LocalContext.current
+    var questions by rememberSaveable { mutableStateOf(false) }
+
+    AnimatedContent(
+        targetState = questions,
+        transitionSpec = {
+            val dir = if (targetState) 1 else -1
+            (slideInHorizontally { it * dir } + fadeIn()) togetherWith (slideOutHorizontally { -it * dir } + fadeOut())
+        },
+        label = "stage"
+    ) { q ->
+        if (!q) {
+            AuthContent(
+                cloudConfigured = account.cloudConfigured,
+                googleEnabled = account.googleEnabled,
+                status = status,
+                signedIn = session?.let { SignedIn(it.email, hasCloudData) },
+                onSignIn = account::signIn,
+                onSignUp = account::signUp,
+                onGoogle = { account.signInWithGoogle(context) },
+                onDownload = { account.download { vm.skip(onDone) } },
+                onContinue = { questions = true },
+                onRestoreFile = { vm.skip(onRestore) }
+            )
+        } else {
+            OnboardingContent(
+                profile = profile,
+                onProfile = { vm.profile.value = it },
+                diets = diets,
+                dietId = dietId,
+                onDiet = { vm.dietId.value = it },
+                calories = vm.calories(),
+                onFinish = { vm.finish(onDone) },
+                onSkip = { vm.skip(onDone) },
+                onBack = { questions = false }
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -114,7 +141,7 @@ internal fun OnboardingContent(
     calories: Double,
     onFinish: () -> Unit,
     onSkip: () -> Unit,
-    onRestore: () -> Unit,
+    onBack: () -> Unit,
     initialStep: Int = 0
 ) {
     var step by rememberSaveable { mutableIntStateOf(initialStep) }
@@ -147,57 +174,20 @@ internal fun OnboardingContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 when (s) {
-                    0 -> Welcome(onRestore)
-                    1 -> AboutYou(profile, onProfile)
-                    2 -> Goal(profile, onProfile, calories)
+                    0 -> AboutYou(profile, onProfile)
+                    1 -> Goal(profile, onProfile, calories)
                     else -> DietChoice(diets, dietId, onDiet, calories)
                 }
             }
         }
         Row(Modifier.fillMaxWidth().padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (step > 0) TextButton(onClick = { step-- }) { Text("Назад") }
+            TextButton(onClick = { if (step > 0) step-- else onBack() }) { Text("Назад") }
             Spacer(Modifier.weight(1f))
             Button(
                 onClick = { if (step < STEPS - 1) step++ else onFinish() },
                 modifier = Modifier.height(52.dp)
-            ) { Text(if (step < STEPS - 1) (if (step == 0) "Начать" else "Далее") else "Готово") }
+            ) { Text(if (step < STEPS - 1) "Далее" else "Готово") }
         }
-    }
-}
-
-@Composable
-private fun Welcome(onRestore: () -> Unit) {
-    Spacer(Modifier.height(12.dp))
-    Image(
-        painterResource(R.drawable.logo), contentDescription = null,
-        modifier = Modifier.size(220.dp).clip(RoundedCornerShape(48.dp))
-    )
-    Spacer(Modifier.height(20.dp))
-    Text("Считай калории легко", style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
-    Spacer(Modifier.height(8.dp))
-    Text(
-        "Ответь на пару вопросов — и мы рассчитаем твою норму калорий и БЖУ.",
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center
-    )
-    Spacer(Modifier.height(24.dp))
-    Feature(Icons.Filled.QrCodeScanner, "Сканер штрихкодов и поиск по нескольким базам")
-    Feature(Icons.Filled.AutoAwesome, "ИИ считает блюдо по описанию")
-    Feature(Icons.Filled.MenuBook, "Рецепты, диеты и рацион на неделю")
-    Feature(Icons.Filled.ShowChart, "Статистика, вес и вода")
-    Spacer(Modifier.height(12.dp))
-    TextButton(onClick = onRestore) { Text("У меня уже есть аккаунт или резервная копия") }
-}
-
-@Composable
-private fun Feature(icon: ImageVector, text: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -205,7 +195,7 @@ private fun Feature(icon: ImageVector, text: String) {
 @Composable
 private fun AboutYou(p: Profile, onChange: (Profile) -> Unit) {
     Text("О тебе", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.fillMaxWidth())
-    Text("Нужно для расчёта нормы. Данные остаются на телефоне.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
+    Text("Нужно, чтобы рассчитать твою норму калорий и БЖУ.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(20.dp))
     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
         Sex.entries.forEachIndexed { i, s ->
@@ -242,7 +232,7 @@ private fun AboutYou(p: Profile, onChange: (Profile) -> Unit) {
 
 @Composable
 private fun Num(label: String, value: Double, modifier: Modifier, onValue: (Double) -> Unit) {
-    var text by remember(label) { androidx.compose.runtime.mutableStateOf(formatGrams(value)) }
+    var text by remember(label) { mutableStateOf(formatGrams(value)) }
     OutlinedTextField(
         value = text,
         onValueChange = { v -> text = v; v.toNumberOrNull()?.let(onValue) },

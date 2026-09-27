@@ -37,20 +37,28 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     private val _status = MutableStateFlow<AccountStatus>(AccountStatus.Idle)
     val status: StateFlow<AccountStatus> = _status.asStateFlow()
 
-    private fun run(busy: String, block: suspend () -> String) {
+    /** After sign-in: does the cloud already hold a backup? null while unknown. */
+    private val _cloudHasData = MutableStateFlow<Boolean?>(null)
+    val cloudHasData: StateFlow<Boolean?> = _cloudHasData.asStateFlow()
+
+    private fun run(busy: String, then: (() -> Unit)? = null, block: suspend () -> String) {
         viewModelScope.launch {
             _status.value = AccountStatus.Busy(busy)
             _status.value = try {
-                AccountStatus.Done(block())
+                AccountStatus.Done(block()).also { then?.invoke() }
             } catch (e: Exception) {
                 AccountStatus.Failed(e.message ?: "Что-то пошло не так")
             }
         }
     }
 
-    fun signIn(email: String, password: String) = run("Вход…") {
-        val s = graph.cloud.signIn(email.trim(), password)
+    private suspend fun signedIn(s: CloudSession) {
         graph.settings.setCloudSession(s)
+        _cloudHasData.value = try { graph.cloud.download(s) != null } catch (e: Exception) { false }
+    }
+
+    fun signIn(email: String, password: String) = run("Вход…") {
+        signedIn(graph.cloud.signIn(email.trim(), password))
         "Вход выполнен. Можно загрузить данные из облака или сохранить текущие."
     }
 
@@ -58,7 +66,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     fun signInWithGoogle(activityContext: android.content.Context) = run("Вход через Google…") {
         val token = com.example.calorietracker.data.cloud.GoogleSignIn.requestToken(activityContext, graph.cloud.googleClientId)
         val s = graph.cloud.signInWithGoogle(token.idToken, token.rawNonce)
-        graph.settings.setCloudSession(s)
+        signedIn(s)
         "Вход выполнен: ${s.email}. Можно загрузить данные из облака или сохранить текущие."
     }
 
@@ -68,6 +76,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
             "Аккаунт создан. Подтверди email по ссылке из письма и войди."
         } else {
             graph.settings.setCloudSession(s)
+            _cloudHasData.value = false
             graph.syncUp()?.let { throw IllegalStateException(it) }
             "Аккаунт создан, данные сохранены в облако."
         }
@@ -78,7 +87,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         "Данные сохранены в облако."
     }
 
-    fun download() = run("Загружаю из облака…") {
+    fun download(then: (() -> Unit)? = null) = run("Загружаю из облака…", then) {
         val s = graph.cloud.fresh(session.value ?: throw IllegalStateException("Не выполнен вход"))
         graph.settings.setCloudSession(s)
         val (json, _) = graph.cloud.download(s) ?: throw IllegalStateException("В облаке ещё нет сохранённых данных.")
@@ -90,6 +99,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     fun signOut() = run("Выход…") {
         session.value?.let { graph.cloud.signOut(it) }
         graph.settings.setCloudSession(null)
+        _cloudHasData.value = null
         "Вы вышли. Данные на телефоне остались."
     }
 

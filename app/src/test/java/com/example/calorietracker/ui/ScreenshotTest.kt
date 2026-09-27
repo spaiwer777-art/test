@@ -31,6 +31,7 @@ import com.example.calorietracker.viewmodel.StatsRange
 import com.example.calorietracker.viewmodel.StatsUiState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalInspectionMode
+import com.example.calorietracker.viewmodel.AccountStatus
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
@@ -141,12 +142,27 @@ class ScreenshotTest {
         DietDetailsContent(sampleDiets[1], active = false, profile = Profile(Sex.FEMALE, 29, 168.0, 70.0, ActivityLevel.LIGHT), onStart = {}, onStop = {}, onEdit = {}, onDelete = null, onBack = {})
     }
 
-    @Test fun onboardingWelcome() = themed(dark = false) {
+    @Test fun onboardingAuth() = themed(dark = false) {
+        AuthContent(true, true, AccountStatus.Idle, null, { _, _ -> }, { _, _ -> }, {}, {}, {}, {})
+    }
+
+    @Test fun onboardingAuthConfirmDark() = themed(dark = true) {
+        AuthContent(
+            true, false, AccountStatus.Done("Аккаунт создан. Подтверди email по ссылке из письма и войди."),
+            null, { _, _ -> }, { _, _ -> }, {}, {}, {}, {}, initialLogin = true
+        )
+    }
+
+    @Test fun onboardingSignedIn() = themed(dark = false) {
+        AuthContent(true, true, AccountStatus.Idle, SignedIn("anna@mail.ru", true), { _, _ -> }, { _, _ -> }, {}, {}, {}, {})
+    }
+
+    @Test fun onboardingAbout() = themed(dark = false) {
         OnboardingContent(Profile(), {}, sampleDiets, 0, {}, 2100.0, {}, {}, {})
     }
 
     @Test fun onboardingGoalDark() = themed(dark = true) {
-        OnboardingContent(Profile(), {}, sampleDiets, 0, {}, 2350.0, {}, {}, {}, initialStep = 2)
+        OnboardingContent(Profile(), {}, sampleDiets, 0, {}, 2350.0, {}, {}, {}, initialStep = 1)
     }
 
     @Test fun worldRecipes() = themed(dark = false) {
