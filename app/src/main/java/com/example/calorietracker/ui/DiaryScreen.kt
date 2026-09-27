@@ -1,5 +1,43 @@
 package com.example.calorietracker.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import coil.compose.AsyncImage
+import com.example.calorietracker.data.MealPhoto
+import com.example.calorietracker.data.PhotoStore
+import com.example.calorietracker.ui.components.AnimatedNumber
+import com.example.calorietracker.ui.components.IconBadge
+import com.example.calorietracker.ui.components.SectionCard
+import com.example.calorietracker.ui.components.ThinBar
+import com.example.calorietracker.ui.theme.isDarkSurface
+import java.io.File
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -90,20 +128,34 @@ fun DiaryScreen(
     onAddFood: (day: Long, meal: MealType) -> Unit,
     onScanBarcode: (day: Long, meal: MealType) -> Unit,
     onAiQuickAdd: (day: Long, meal: MealType) -> Unit,
+    onOpenFood: (foodId: Long, day: Long, meal: MealType) -> Unit,
+    onOpenRecipe: (recipeId: Long, day: Long, meal: MealType) -> Unit,
     bottomBar: @Composable () -> Unit
 ) {
     val viewModel: DiaryViewModel = viewModel()
     val state by viewModel.uiState.collectAsState()
     val selectedDay by viewModel.selectedDay.collectAsState()
+    val photos by viewModel.photos.collectAsState()
+    val water by viewModel.waterMl.collectAsState()
+    val waterGoal by viewModel.waterGoalMl.collectAsState()
+    val requestPhoto = rememberMealPhotoPicker(viewModel::addPhoto)
     DiaryContent(
         state = state,
         selectedDay = selectedDay,
+        photos = photos,
+        waterMl = water,
+        waterGoalMl = waterGoal,
         onShiftDay = viewModel::shiftDay,
         onToday = viewModel::goToToday,
         onDelete = viewModel::deleteEntry,
+        onSetWater = viewModel::setWater,
+        onRequestPhoto = requestPhoto,
+        onDeletePhoto = viewModel::deletePhoto,
         onAddFood = onAddFood,
         onScanBarcode = onScanBarcode,
         onAiQuickAdd = onAiQuickAdd,
+        onOpenFood = onOpenFood,
+        onOpenRecipe = onOpenRecipe,
         bottomBar = bottomBar
     )
 }
@@ -113,14 +165,25 @@ fun DiaryScreen(
 internal fun DiaryContent(
     state: DiaryUiState,
     selectedDay: Long,
+    photos: List<MealPhoto>,
+    waterMl: Int,
+    waterGoalMl: Int,
     onShiftDay: (Long) -> Unit,
     onToday: () -> Unit,
     onDelete: (Long) -> Unit,
+    onSetWater: (Int) -> Unit,
+    onRequestPhoto: (MealType, fromCamera: Boolean) -> Unit,
+    onDeletePhoto: (MealPhoto) -> Unit,
     onAddFood: (day: Long, meal: MealType) -> Unit,
     onScanBarcode: (day: Long, meal: MealType) -> Unit,
     onAiQuickAdd: (day: Long, meal: MealType) -> Unit,
+    onOpenFood: (foodId: Long, day: Long, meal: MealType) -> Unit,
+    onOpenRecipe: (recipeId: Long, day: Long, meal: MealType) -> Unit,
     bottomBar: @Composable () -> Unit
 ) {
+    var sheetEntry by remember { mutableStateOf<DiaryEntry?>(null) }
+    var viewedPhoto by remember { mutableStateOf<MealPhoto?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Дневник", style = MaterialTheme.typography.headlineSmall) })
@@ -152,12 +215,30 @@ internal fun DiaryContent(
                 MealCard(
                     meal = meal,
                     entries = state.entries.filter { it.mealType == meal },
+                    photos = photos.filter { it.mealType == meal },
                     goal = state.dailyGoal * meal.goalShare,
                     onAdd = { onAddFood(selectedDay, meal) },
-                    onDelete = onDelete
+                    onEntryClick = { sheetEntry = it },
+                    onRequestPhoto = { camera -> onRequestPhoto(meal, camera) },
+                    onPhotoClick = { viewedPhoto = it }
                 )
             }
+            item(key = "water") { WaterCard(waterMl, waterGoalMl, onSetWater) }
         }
+    }
+
+    sheetEntry?.let { entry ->
+        EntryDetailsSheet(
+            entry = entry,
+            state = state,
+            onDismiss = { sheetEntry = null },
+            onDelete = { onDelete(entry.id); sheetEntry = null },
+            onOpenFood = entry.foodId?.let { id -> { sheetEntry = null; onOpenFood(id, selectedDay, entry.mealType) } },
+            onOpenRecipe = entry.recipeId?.let { id -> { sheetEntry = null; onOpenRecipe(id, selectedDay, entry.mealType) } }
+        )
+    }
+    viewedPhoto?.let { photo ->
+        PhotoViewer(photo, onDismiss = { viewedPhoto = null }, onDelete = { onDeletePhoto(photo); viewedPhoto = null })
     }
 }
 
@@ -231,12 +312,16 @@ private fun SummaryCard(state: DiaryUiState) {
 private fun MealCard(
     meal: MealType,
     entries: List<DiaryEntry>,
+    photos: List<MealPhoto>,
     goal: Double,
     onAdd: () -> Unit,
-    onDelete: (Long) -> Unit
+    onEntryClick: (DiaryEntry) -> Unit,
+    onRequestPhoto: (fromCamera: Boolean) -> Unit,
+    onPhotoClick: (MealPhoto) -> Unit
 ) {
     val color = mealColor(meal)
     val eaten = entries.sumOf { it.calories }
+    var photoMenu by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(spring(stiffness = 400f)),
         shape = MaterialTheme.shapes.medium,
@@ -247,12 +332,7 @@ private fun MealCard(
             Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                Modifier.size(44.dp).clip(CircleShape).background(color.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(meal.icon, contentDescription = null, tint = color)
-            }
+            IconBadge(meal.icon, color)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(meal.label(), style = MaterialTheme.typography.titleMedium)
@@ -261,23 +341,61 @@ private fun MealCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(Modifier.height(6.dp))
+                val progress by animateFloatAsState(if (goal > 0) (eaten / goal).toFloat() else 0f, label = "meal-progress")
+                ThinBar(progress, color, Modifier.width(120.dp), height = 4.dp)
+            }
+            Box {
+                IconButton(onClick = { photoMenu = true }) {
+                    Icon(Icons.Outlined.PhotoCamera, contentDescription = "Прикрепить фото", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                DropdownMenu(expanded = photoMenu, onDismissRequest = { photoMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Сделать фото") },
+                        leadingIcon = { Icon(Icons.Outlined.PhotoCamera, null) },
+                        onClick = { photoMenu = false; onRequestPhoto(true) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Выбрать из галереи") },
+                        leadingIcon = { Icon(Icons.Outlined.PhotoLibrary, null) },
+                        onClick = { photoMenu = false; onRequestPhoto(false) }
+                    )
+                }
             }
             FilledTonalIconButton(onClick = onAdd) {
                 Icon(Icons.Filled.Add, contentDescription = "Добавить в «${meal.label()}»")
             }
         }
+        if (photos.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                items(photos, key = { it.id }) { photo ->
+                    AsyncImage(
+                        model = File(photo.path),
+                        contentDescription = "Фото приёма пищи",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(72.dp).clip(MaterialTheme.shapes.small)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { onPhotoClick(photo) }
+                    )
+                }
+            }
+        }
         if (entries.isNotEmpty()) {
             HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            entries.forEach { entry -> EntryRow(entry, onDelete) }
+            entries.forEach { entry -> EntryRow(entry) { onEntryClick(entry) } }
             Spacer(Modifier.height(4.dp))
         }
     }
 }
 
 @Composable
-private fun EntryRow(entry: DiaryEntry, onDelete: (Long) -> Unit) {
+private fun EntryRow(entry: DiaryEntry, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
@@ -289,8 +407,159 @@ private fun EntryRow(entry: DiaryEntry, onDelete: (Long) -> Unit) {
             Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text("${entry.calories.roundToInt()} ккал", style = MaterialTheme.typography.labelLarge)
-        IconButton(onClick = { onDelete(entry.id) }) {
-            Icon(Icons.Outlined.Delete, contentDescription = "Удалить", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+private val WaterBlueLight = Color(0xFF2A78D6)
+private val WaterBlueDark = Color(0xFF3987E5)
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WaterCard(ml: Int, goalMl: Int, onSet: (Int) -> Unit) {
+    val glass = 250
+    val cups = ((goalMl + glass - 1) / glass).coerceIn(4, 14)
+    val filled = ml / glass
+    val water = if (isDarkSurface()) WaterBlueDark else WaterBlueLight
+    SectionCard(
+        title = "Вода",
+        subtitle = "Стакан — 250 мл. Норма рассчитана по весу и активности",
+        action = {
+            Column(horizontalAlignment = Alignment.End) {
+                AnimatedNumber(ml, MaterialTheme.typography.titleLarge)
+                Text("из $goalMl мл", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    ) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            repeat(cups) { i ->
+                val isFilled = i < filled
+                val scale by animateFloatAsState(if (isFilled) 1f else 0.85f, spring(dampingRatio = 0.4f), label = "cup")
+                val tint by animateColorAsState(if (isFilled) water else MaterialTheme.colorScheme.outlineVariant, label = "cupColor")
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape)
+                        .clickable { onSet(if (filled == i + 1) i * glass else (i + 1) * glass) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        if (isFilled) Icons.Filled.WaterDrop else Icons.Outlined.WaterDrop,
+                        contentDescription = "${(i + 1) * glass} мл",
+                        tint = tint,
+                        modifier = Modifier.size(28.dp).scale(scale)
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        ThinBar(if (goalMl > 0) ml.toFloat() / goalMl else 0f, water)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EntryDetailsSheet(
+    entry: DiaryEntry,
+    state: DiaryUiState,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+    onOpenFood: (() -> Unit)?,
+    onOpenRecipe: (() -> Unit)?
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp)) {
+            Text(entry.foodName, style = MaterialTheme.typography.headlineSmall)
+            Text(
+                entry.mealType.label() + if (entry.grams > 0) " · ${entry.grams.roundToInt()} г" else "",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("${entry.calories.roundToInt()}", style = MaterialTheme.typography.displaySmall)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "ккал · ${(entry.calories / state.dailyGoal * 100).roundToInt()}% дневной нормы",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            val goals = state.macroGoals
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                MacroBar("Углеводы", entry.carbs, goals.carbs, macroColor(Macro.CARBS), Modifier.weight(1f))
+                MacroBar("Белки", entry.protein, goals.protein, macroColor(Macro.PROTEIN), Modifier.weight(1f))
+                MacroBar("Жиры", entry.fat, goals.fat, macroColor(Macro.FAT), Modifier.weight(1f))
+            }
+            Text(
+                "Полоски — доля от дневной нормы БЖУ",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Spacer(Modifier.height(20.dp))
+            if (onOpenFood != null) {
+                OutlinedButton(onClick = onOpenFood, modifier = Modifier.fillMaxWidth()) { Text("Открыть карточку продукта") }
+            }
+            if (onOpenRecipe != null) {
+                OutlinedButton(onClick = onOpenRecipe, modifier = Modifier.fillMaxWidth()) { Text("Открыть рецепт") }
+            }
+            TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.width(8.dp))
+                Text("Удалить из дневника", color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhotoViewer(photo: MealPhoto, onDismiss: () -> Unit, onDelete: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            AsyncImage(
+                model = File(photo.path),
+                contentDescription = "Фото приёма пищи",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+            Row(Modifier.align(Alignment.TopEnd).padding(16.dp)) {
+                IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, "Удалить фото", tint = Color.White) }
+                IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, "Закрыть", tint = Color.White) }
+            }
+        }
+    }
+}
+
+/**
+ * Returns a callback that takes a photo with the camera or picks one from the
+ * gallery and hands the resulting Uri to [onPhoto]. The camera needs the
+ * CAMERA permission because the app declares it for the barcode scanner.
+ */
+@Composable
+private fun rememberMealPhotoPicker(onPhoto: (Uri, MealType) -> Unit): (MealType, Boolean) -> Unit {
+    val context = LocalContext.current
+    var pendingMeal by remember { mutableStateOf(MealType.BREAKFAST) }
+    val cameraUri = remember {
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", PhotoStore.cameraFile(context))
+    }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { onPhoto(it, pendingMeal) }
+    }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        if (ok) onPhoto(cameraUri, pendingMeal)
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) camera.launch(cameraUri)
+    }
+    return { meal, fromCamera ->
+        pendingMeal = meal
+        if (!fromCamera) {
+            gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            camera.launch(cameraUri)
+        } else {
+            permission.launch(Manifest.permission.CAMERA)
         }
     }
 }

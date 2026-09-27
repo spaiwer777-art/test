@@ -3,9 +3,8 @@ package com.example.calorietracker.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.calorietracker.data.AppDatabase
+import com.example.calorietracker.graph
 import com.example.calorietracker.data.Food
-import com.example.calorietracker.data.FoodRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +19,7 @@ sealed class ScanState {
 }
 
 class ScannerViewModel(application: Application) : AndroidViewModel(application) {
-    private val repo = FoodRepository(AppDatabase.get(application))
+    private val repo = application.graph.foods
 
     private val _state = MutableStateFlow<ScanState>(ScanState.Idle)
     val state: StateFlow<ScanState> = _state.asStateFlow()

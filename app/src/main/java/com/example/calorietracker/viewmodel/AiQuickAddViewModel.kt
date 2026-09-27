@@ -3,10 +3,9 @@ package com.example.calorietracker.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.calorietracker.data.AppDatabase
-import com.example.calorietracker.data.FoodRepository
-import com.example.calorietracker.data.SettingsRepository
-import com.example.calorietracker.network.AiNutritionEstimate
+import com.example.calorietracker.data.AiIngredient
+import com.example.calorietracker.data.AiMealEstimate
+import com.example.calorietracker.graph
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,43 +17,55 @@ import java.io.IOException
 sealed class AiState {
     object Idle : AiState()
     object Loading : AiState()
-    data class Success(val estimate: AiNutritionEstimate) : AiState()
+    data class Success(val estimate: AiMealEstimate) : AiState()
     data class Error(val message: String) : AiState()
     object NoApiKey : AiState()
 }
 
+/** Human-readable message for a failed Groq call. */
+fun aiErrorMessage(e: Exception): String = when (e) {
+    is HttpException -> when (e.code()) {
+        401 -> "Groq не принял API-ключ. Проверь ключ в настройках."
+        413 -> "Запрос слишком большой для лимитов Groq. Сократи его."
+        429 -> "Достигнут лимит бесплатного Groq. Подожди минуту (или до завтра, если исчерпан дневной лимит)."
+        else -> "Сервер Groq ответил ошибкой ${e.code()}. Попробуй позже."
+    }
+    is IOException -> "Нет подключения к интернету."
+    else -> "ИИ вернул непонятный ответ. Попробуй ещё раз или переформулируй."
+}
+
 class AiQuickAddViewModel(application: Application) : AndroidViewModel(application) {
-    private val foodRepo = FoodRepository(AppDatabase.get(application))
-    private val settingsRepo = SettingsRepository(application)
+    private val graph = application.graph
 
     private val _state = MutableStateFlow<AiState>(AiState.Idle)
     val state: StateFlow<AiState> = _state.asStateFlow()
 
     fun estimate(description: String) {
         viewModelScope.launch {
-            val apiKey = settingsRepo.groqApiKey.first()
+            val apiKey = graph.settings.groqApiKey.first()
             if (apiKey.isBlank()) {
                 _state.value = AiState.NoApiKey
                 return@launch
             }
             _state.value = AiState.Loading
-            try {
-                val result = foodRepo.estimateWithAi(description, apiKey)
-                _state.value = AiState.Success(result)
-            } catch (e: HttpException) {
-                _state.value = AiState.Error(
-                    when (e.code()) {
-                        401 -> "Groq не принял API-ключ. Проверь ключ в настройках."
-                        429 -> "Слишком много запросов к Groq. Подожди минуту и попробуй снова."
-                        else -> "Сервер Groq ответил ошибкой ${e.code()}. Попробуй позже."
-                    }
-                )
-            } catch (e: IOException) {
-                _state.value = AiState.Error("Нет подключения к интернету.")
+            _state.value = try {
+                AiState.Success(graph.ai.estimateMeal(description, apiKey))
             } catch (e: Exception) {
-                _state.value = AiState.Error("ИИ вернул непонятный ответ. Попробуй описать блюдо иначе.")
+                AiState.Error(aiErrorMessage(e))
             }
         }
+    }
+
+    /** Lets the user correct an ingredient's weight; totals recompute from per-100g values. */
+    fun setGrams(index: Int, grams: Double) = updateItems { items ->
+        items.mapIndexed { i, it -> if (i == index) it.copy(grams = grams.coerceAtLeast(0.0)) else it }
+    }
+
+    fun removeItem(index: Int) = updateItems { items -> items.filterIndexed { i, _ -> i != index } }
+
+    private fun updateItems(transform: (List<AiIngredient>) -> List<AiIngredient>) {
+        val s = _state.value as? AiState.Success ?: return
+        _state.value = AiState.Success(s.estimate.copy(items = transform(s.estimate.items)))
     }
 
     fun reset() {

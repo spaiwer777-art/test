@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 class Converters {
     @TypeConverter
@@ -13,13 +15,29 @@ class Converters {
 
     @TypeConverter
     fun toMealType(value: String): MealType = MealType.valueOf(value)
+
+    @TypeConverter
+    fun fromFoodSource(value: FoodSource): String = value.name
+
+    @TypeConverter
+    fun toFoodSource(value: String): FoodSource =
+        FoodSource.entries.firstOrNull { it.name == value } ?: FoodSource.USER
 }
 
-@Database(entities = [Food::class, DiaryEntry::class], version = 1, exportSchema = false)
+@Database(
+    entities = [
+        Food::class, DiaryEntry::class, Recipe::class, RecipeIngredient::class,
+        MealPhoto::class, WeightEntry::class, WaterEntry::class, MealPlanEntity::class
+    ],
+    version = 2,
+    exportSchema = true
+)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun foodDao(): FoodDao
     abstract fun diaryDao(): DiaryDao
+    abstract fun recipeDao(): RecipeDao
+    abstract fun trackingDao(): TrackingDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -30,7 +48,14 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "calorie_tracker.db"
-                ).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
             }
+    }
+}
+
+/** v1 -> v2: richer foods, links from diary entries, recipes, photos, weight, water, plans. */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        MIGRATION_1_2_SQL.forEach(db::execSQL)
     }
 }

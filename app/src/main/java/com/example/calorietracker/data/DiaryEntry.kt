@@ -23,5 +23,8 @@ data class DiaryEntry(
     val carbs: Double,
     val mealType: MealType,
     /** Day this entry belongs to, as an epoch day number (days since 1970-01-01). */
-    val epochDay: Long
+    val epochDay: Long,
+    /** Source product or recipe, if any, so the entry can open its card. */
+    val foodId: Long? = null,
+    val recipeId: Long? = null
 )

@@ -3,11 +3,16 @@ package com.example.calorietracker.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.calorietracker.data.AppDatabase
+import android.net.Uri
+import com.example.calorietracker.data.Calc
 import com.example.calorietracker.data.DiaryEntry
-import com.example.calorietracker.data.DiaryRepository
+import com.example.calorietracker.data.MealPhoto
 import com.example.calorietracker.data.MealType
-import com.example.calorietracker.data.SettingsRepository
+import com.example.calorietracker.data.PhotoStore
+import com.example.calorietracker.graph
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,8 +62,10 @@ data class DiaryUiState(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DiaryViewModel(application: Application) : AndroidViewModel(application) {
-    private val diaryRepo = DiaryRepository(AppDatabase.get(application))
-    private val settingsRepo = SettingsRepository(application)
+    private val graph = application.graph
+    private val diaryRepo = graph.diary
+    private val settingsRepo = graph.settings
+    private val tracking = graph.tracking
 
     private val selectedEpochDay = MutableStateFlow(LocalDate.now().toEpochDay())
     val selectedDay: StateFlow<Long> = selectedEpochDay.asStateFlow()
@@ -70,6 +77,39 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DiaryUiState())
+
+    val photos: StateFlow<List<MealPhoto>> = selectedEpochDay
+        .flatMapLatest { tracking.photosForDay(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val waterMl: StateFlow<Int> = selectedEpochDay
+        .flatMapLatest { day -> tracking.water(day).map { it?.ml ?: 0 } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    /** Water goal from the latest logged weight (or the profile weight). */
+    val waterGoalMl: StateFlow<Int> = combine(settingsRepo.profile, tracking.latestWeight()) { profile, w ->
+        Calc.waterMl(w?.kg ?: profile.weightKg, profile.activity)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2000)
+
+    fun setWater(ml: Int) {
+        val day = selectedEpochDay.value
+        viewModelScope.launch { tracking.setWater(day, ml) }
+    }
+
+    /** Copies the picked/captured image into app storage and attaches it to the meal. */
+    fun addPhoto(uri: Uri, meal: MealType) {
+        val day = selectedEpochDay.value
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            val file = withContext(Dispatchers.IO) { runCatching { PhotoStore.importImage(app, uri) }.getOrNull() }
+                ?: return@launch
+            tracking.addPhoto(MealPhoto(epochDay = day, mealType = meal, path = file.absolutePath, createdAt = System.currentTimeMillis()))
+        }
+    }
+
+    fun deletePhoto(photo: MealPhoto) {
+        viewModelScope.launch(Dispatchers.IO) { tracking.deletePhoto(photo) }
+    }
 
     fun shiftDay(delta: Long) {
         selectedEpochDay.value += delta
@@ -89,7 +129,8 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
         fatPer100: Double,
         carbsPer100: Double,
         meal: MealType,
-        epochDay: Long
+        epochDay: Long,
+        foodId: Long? = null
     ) {
         viewModelScope.launch(NonCancellable) {
             val factor = grams / 100.0
@@ -102,7 +143,8 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
                     fat = fatPer100 * factor,
                     carbs = carbsPer100 * factor,
                     mealType = meal,
-                    epochDay = epochDay
+                    epochDay = epochDay,
+                    foodId = foodId
                 )
             )
         }
@@ -115,19 +157,22 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
         fat: Double,
         carbs: Double,
         meal: MealType,
-        epochDay: Long
+        epochDay: Long,
+        grams: Double = 0.0,
+        recipeId: Long? = null
     ) {
         viewModelScope.launch(NonCancellable) {
             diaryRepo.addEntry(
                 DiaryEntry(
                     foodName = foodName,
-                    grams = 0.0,
+                    grams = grams,
                     calories = calories,
                     protein = protein,
                     fat = fat,
                     carbs = carbs,
                     mealType = meal,
-                    epochDay = epochDay
+                    epochDay = epochDay,
+                    recipeId = recipeId
                 )
             )
         }

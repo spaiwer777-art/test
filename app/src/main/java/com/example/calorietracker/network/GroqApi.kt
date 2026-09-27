@@ -1,5 +1,6 @@
 package com.example.calorietracker.network
 
+import com.google.gson.annotations.SerializedName
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
@@ -12,10 +13,16 @@ import retrofit2.http.POST
  */
 data class ChatMessage(val role: String, val content: String)
 
+data class ResponseFormat(val type: String)
+
 data class ChatCompletionRequest(
     val model: String,
     val messages: List<ChatMessage>,
-    val temperature: Double = 0.2
+    val temperature: Double = 0.2,
+    @SerializedName("response_format") val responseFormat: ResponseFormat? = null,
+    /** Only for reasoning models (gpt-oss): "low" | "medium" | "high". Null fields are not sent. */
+    @SerializedName("reasoning_effort") val reasoningEffort: String? = null,
+    @SerializedName("max_completion_tokens") val maxCompletionTokens: Int? = null
 )
 
 data class ChatChoice(val message: ChatMessage)

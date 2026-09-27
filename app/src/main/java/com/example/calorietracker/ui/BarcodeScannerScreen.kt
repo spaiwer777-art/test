@@ -30,8 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.calorietracker.data.MealType
-import com.example.calorietracker.viewmodel.DiaryViewModel
 import com.example.calorietracker.viewmodel.ScanState
 import com.example.calorietracker.viewmodel.ScannerViewModel
 import com.google.mlkit.vision.barcode.BarcodeScanning
@@ -39,11 +37,10 @@ import com.google.mlkit.vision.common.InputImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BarcodeScannerScreen(epochDay: Long, initialMeal: MealType, onDone: () -> Unit, onBack: () -> Unit) {
+fun BarcodeScannerScreen(onFound: (Long) -> Unit, onSearchByName: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val vm: ScannerViewModel = viewModel()
-    val diaryVm: DiaryViewModel = viewModel()
     val state by vm.state.collectAsState()
 
     var hasPermission by remember {
@@ -122,33 +119,20 @@ fun BarcodeScannerScreen(epochDay: Long, initialMeal: MealType, onDone: () -> Un
             when (val s = state) {
                 is ScanState.Loading -> BottomBanner { Text("Ищу продукт...") }
                 is ScanState.NotFound -> BottomBanner {
-                    Text("Продукт не найден в базе. Добавь его вручную.")
-                    TextButton(onClick = { vm.reset(); onBack() }) { Text("Ок") }
+                    Text("Этого штрихкода нет в Open Food Facts.", style = MaterialTheme.typography.titleSmall)
+                    Text("Найди продукт по названию — в справочной базе, онлайн или посчитай с ИИ.")
+                    Row {
+                        TextButton(onClick = { vm.reset(); onSearchByName() }) { Text("Искать по названию") }
+                        TextButton(onClick = { vm.reset() }) { Text("Сканировать ещё") }
+                    }
                 }
                 is ScanState.Error -> BottomBanner {
                     Text("Ошибка: ${s.message}")
                     TextButton(onClick = { vm.reset() }) { Text("Повторить") }
                 }
-                is ScanState.Found -> {
-                    PortionDialog(
-                        food = s.food,
-                        initialMeal = initialMeal,
-                        onDismiss = { vm.reset() },
-                        onConfirm = { grams, meal ->
-                            diaryVm.addEntry(
-                                foodName = s.food.name,
-                                grams = grams,
-                                calsPer100 = s.food.caloriesPer100g,
-                                proteinPer100 = s.food.proteinPer100g,
-                                fatPer100 = s.food.fatPer100g,
-                                carbsPer100 = s.food.carbsPer100g,
-                                meal = meal,
-                                epochDay = epochDay
-                            )
-                            vm.reset()
-                            onDone()
-                        }
-                    )
+                is ScanState.Found -> LaunchedEffect(s.food.id) {
+                    vm.reset()
+                    onFound(s.food.id)
                 }
                 ScanState.Idle -> Unit
             }

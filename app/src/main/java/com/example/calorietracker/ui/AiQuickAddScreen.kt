@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -51,7 +52,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.calorietracker.data.AiIngredient
+import com.example.calorietracker.data.AiMealEstimate
 import com.example.calorietracker.data.MealType
+import com.example.calorietracker.ui.components.AnimatedNumber
+import com.example.calorietracker.ui.components.formatGrams
+import com.example.calorietracker.ui.components.toNumberOrNull
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import com.example.calorietracker.ui.components.MealSelector
 import com.example.calorietracker.ui.theme.Macro
 import com.example.calorietracker.ui.theme.macroColor
@@ -72,6 +80,7 @@ private val examples = listOf(
 fun AiQuickAddScreen(
     epochDay: Long,
     initialMeal: MealType,
+    initialText: String,
     onDone: () -> Unit,
     onOpenSettings: () -> Unit,
     onBack: () -> Unit
@@ -80,7 +89,7 @@ fun AiQuickAddScreen(
     val diaryVm: DiaryViewModel = viewModel()
     val state by vm.state.collectAsState()
 
-    var description by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf(initialText) }
     var meal by remember { mutableStateOf(initialMeal) }
 
     Scaffold(
@@ -152,38 +161,21 @@ fun AiQuickAddScreen(
                     is AiState.Error -> MessageCard(s.message) {
                         TextButton(onClick = { vm.estimate(description) }) { Text("Повторить") }
                     }
-                    is AiState.Success -> {
-                        val e = s.estimate
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.large,
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                        ) {
-                            Column(Modifier.padding(20.dp)) {
-                                Text(e.name, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    "${e.calories.roundToInt()} ккал",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                    MacroValue("Белки", e.protein, macroColor(Macro.PROTEIN))
-                                    MacroValue("Жиры", e.fat, macroColor(Macro.FAT))
-                                    MacroValue("Углеводы", e.carbs, macroColor(Macro.CARBS))
-                                }
-                                Spacer(Modifier.height(16.dp))
-                                Button(
-                                    onClick = {
-                                        diaryVm.addPrecomputedEntry(e.name, e.calories, e.protein, e.fat, e.carbs, meal, epochDay)
-                                        vm.reset()
-                                        onDone()
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) { Text("Добавить в дневник") }
-                            }
+                    is AiState.Success -> AiResultCard(
+                        estimate = s.estimate,
+                        onGrams = vm::setGrams,
+                        onRemove = vm::removeItem,
+                        onAdd = {
+                            val e = s.estimate
+                            diaryVm.addPrecomputedEntry(
+                                e.name, e.items.sumOf { it.calories }, e.items.sumOf { it.protein },
+                                e.items.sumOf { it.fat }, e.items.sumOf { it.carbs }, meal, epochDay,
+                                grams = e.items.sumOf { it.grams }
+                            )
+                            vm.reset()
+                            onDone()
                         }
-                    }
+                    )
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -218,5 +210,76 @@ private fun MessageCard(text: String, action: @Composable () -> Unit) {
                 action()
             }
         }
+    }
+}
+
+@Composable
+private fun AiResultCard(
+    estimate: AiMealEstimate,
+    onGrams: (Int, Double) -> Unit,
+    onRemove: (Int) -> Unit,
+    onAdd: () -> Unit
+) {
+    val items = estimate.items
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Text(estimate.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Row(verticalAlignment = Alignment.Bottom) {
+                AnimatedNumber(items.sumOf { it.calories }.roundToInt(), MaterialTheme.typography.headlineMedium, MaterialTheme.colorScheme.onPrimaryContainer)
+                Spacer(Modifier.width(6.dp))
+                Text("ккал", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(bottom = 4.dp))
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                MacroValue("Белки", items.sumOf { it.protein }, macroColor(Macro.PROTEIN))
+                MacroValue("Жиры", items.sumOf { it.fat }, macroColor(Macro.FAT))
+                MacroValue("Углеводы", items.sumOf { it.carbs }, macroColor(Macro.CARBS))
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Состав — поправь граммы, если нужно", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Spacer(Modifier.height(4.dp))
+            items.forEachIndexed { index, item ->
+                IngredientEditRow(item, onGrams = { onGrams(index, it) }, onRemove = { onRemove(index) })
+            }
+            Spacer(Modifier.height(8.dp))
+            val fromBase = items.count { it.baseName != null }
+            Text(
+                if (fromBase > 0) "✓ $fromBase из ${items.size} ингредиентов посчитаны по справочной базе, остальные — оценка ИИ."
+                else "Все значения — оценка ИИ по справочникам. Точность зависит от описания.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onAdd, enabled = items.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Добавить в дневник") }
+        }
+    }
+}
+
+@Composable
+private fun IngredientEditRow(item: AiIngredient, onGrams: (Double) -> Unit, onRemove: () -> Unit) {
+    var text by remember(item.name) { mutableStateOf(formatGrams(item.grams)) }
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(item.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(
+                (if (item.baseName != null) "✓ база: ${item.baseName} · " else "ИИ · ") + "${item.calories.roundToInt()} ккал",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
+            )
+        }
+        OutlinedTextField(
+            value = text,
+            onValueChange = { v -> text = v; v.toNumberOrNull()?.let(onGrams) },
+            suffix = { Text("г") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.width(96.dp),
+            textStyle = MaterialTheme.typography.bodyMedium
+        )
+        IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, contentDescription = "Убрать ингредиент") }
     }
 }
