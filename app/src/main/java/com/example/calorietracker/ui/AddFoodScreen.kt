@@ -37,7 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -101,7 +101,7 @@ fun AddFoodScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-                OutlinedTextField(
+                AppTextField(
                     value = query,
                     onValueChange = vm::setQuery,
                     placeholder = { Text("Например: майонез, творог 5%, гречка") },
@@ -248,11 +248,11 @@ private fun ManualFoodDialog(
         title = { Text("Новый продукт (на 100 г)") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Название") }, singleLine = true)
-                OutlinedTextField(value = calories, onValueChange = { calories = it }, label = { Text("Калории") }, keyboardOptions = numberKeyboard, singleLine = true)
-                OutlinedTextField(value = protein, onValueChange = { protein = it }, label = { Text("Белки, г") }, keyboardOptions = numberKeyboard, singleLine = true)
-                OutlinedTextField(value = fat, onValueChange = { fat = it }, label = { Text("Жиры, г") }, keyboardOptions = numberKeyboard, singleLine = true)
-                OutlinedTextField(value = carbs, onValueChange = { carbs = it }, label = { Text("Углеводы, г") }, keyboardOptions = numberKeyboard, singleLine = true)
+                AppTextField(value = name, onValueChange = { name = it }, label = { Text("Название") }, singleLine = true)
+                AppTextField(value = calories, onValueChange = { calories = it }, label = { Text("Калории") }, keyboardOptions = numberKeyboard, singleLine = true)
+                AppTextField(value = protein, onValueChange = { protein = it }, label = { Text("Белки, г") }, keyboardOptions = numberKeyboard, singleLine = true)
+                AppTextField(value = fat, onValueChange = { fat = it }, label = { Text("Жиры, г") }, keyboardOptions = numberKeyboard, singleLine = true)
+                AppTextField(value = carbs, onValueChange = { carbs = it }, label = { Text("Углеводы, г") }, keyboardOptions = numberKeyboard, singleLine = true)
                 Spacer(Modifier.height(4.dp))
                 Text("Значения — с упаковки, на 100 г продукта.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

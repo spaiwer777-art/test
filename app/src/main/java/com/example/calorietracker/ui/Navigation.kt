@@ -55,6 +55,7 @@ object Routes {
     const val DIET_EDIT = "diet_edit?dietId={dietId}"
     const val ACCOUNT = "account"
     const val ONBOARDING = "onboarding"
+    const val PROFILE = "profile"
     const val WORLD_RECIPE = "world_recipe/{mealId}"
 
     fun addFood(day: Long, meal: MealType) = "add_food/$day/${meal.name}"
@@ -161,6 +162,7 @@ fun AppNavHost(startOnboarding: Boolean = false) {
                 onAiQuickAdd = { day, meal -> navController.navigate(Routes.aiAdd(day, meal)) },
                 onOpenFood = { id, day, meal -> navController.navigate(Routes.food(id, day, meal)) },
                 onOpenRecipe = { id, day, meal -> navController.navigate(Routes.recipe(id, day, meal)) },
+                onOpenProfile = { navController.navigate(Routes.PROFILE) },
                 bottomBar = bottomBar
             )
         }
@@ -180,11 +182,13 @@ fun AppNavHost(startOnboarding: Boolean = false) {
                 onAccount = { navController.navigate(Routes.ACCOUNT) },
                 onCalculators = { navController.navigate(Routes.CALCULATORS) },
                 onSettings = { navController.navigate(Routes.SETTINGS) },
+                onProfile = { navController.navigate(Routes.PROFILE) },
                 bottomBar = bottomBar
             )
         }
 
-        detail(Routes.SETTINGS) { SettingsScreen(onBack = back) }
+        detail(Routes.SETTINGS) { SettingsScreen(onBack = back, onOpenProfile = { navController.navigate(Routes.PROFILE) }) }
+        detail(Routes.PROFILE) { ProfileScreen(onBack = back) }
         detail(Routes.PLAN) {
             PlanScreen(
                 onOpenRecipe = { navController.navigate(Routes.recipe(it, today, mealForCurrentTime())) },

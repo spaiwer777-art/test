@@ -38,7 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -184,9 +184,9 @@ internal fun CalculatorContent(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (needsAge) NumField("Возраст", p.age.toDouble(), Modifier.weight(1f)) { p = p.copy(age = it.roundToInt().coerceIn(14, 100)) }
-                    if (needsHeight) NumField("Рост, см", p.heightCm, Modifier.weight(1f)) { p = p.copy(heightCm = it.coerceIn(120.0, 230.0)) }
-                    if (needsWeight) NumField("Вес, кг", p.weightKg, Modifier.weight(1f)) { p = p.copy(weightKg = it.coerceIn(30.0, 300.0)) }
+                    if (needsAge) NumField("Возраст", p.age.toDouble(), Modifier.weight(1f), 14.0..100.0, decimals = false) { p = p.copy(age = it.roundToInt()) }
+                    if (needsHeight) NumField("Рост, см", p.heightCm, Modifier.weight(1f), 120.0..230.0) { p = p.copy(heightCm = it) }
+                    if (needsWeight) NumField("Вес, кг", p.weightKg, Modifier.weight(1f), 30.0..300.0) { p = p.copy(weightKg = it) }
                 }
                 if (needsActivity) {
                     Spacer(Modifier.height(12.dp))
@@ -240,18 +240,14 @@ internal fun CalculatorContent(
 }
 
 @Composable
-private fun NumField(label: String, value: Double, modifier: Modifier, onValue: (Double) -> Unit) {
-    var text by remember(label) { mutableStateOf(formatGrams(value)) }
-    LaunchedEffect(value) { if (text.toNumberOrNull() != value) text = formatGrams(value) }
-    OutlinedTextField(
-        value = text,
-        onValueChange = { v -> text = v; v.toNumberOrNull()?.let(onValue) },
-        label = { Text(label) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        modifier = modifier
-    )
-}
+private fun NumField(
+    label: String,
+    value: Double,
+    modifier: Modifier,
+    range: ClosedFloatingPointRange<Double>? = null,
+    decimals: Boolean = true,
+    onValue: (Double) -> Unit
+) = com.example.calorietracker.ui.components.NumberField(label, value, onValue, modifier, range = range, decimals = decimals)
 
 @Composable
 private fun BigResult(value: Int, unit: String, caption: String) {
@@ -430,7 +426,7 @@ private fun ExerciseResult(p: Profile) {
             Calc.exercises.forEach { e -> FilterChip(selected = e == exercise, onClick = { exercise = e }, label = { Text(e.name) }) }
         }
         Spacer(Modifier.height(12.dp))
-        NumField("Минут", minutes, Modifier.fillMaxWidth()) { minutes = it.coerceIn(0.0, 600.0) }
+        NumField("Минут", minutes, Modifier.fillMaxWidth(), 0.0..600.0) { minutes = it }
     }
     val kcal = Calc.exerciseKcal(exercise.met, p.weightKg, minutes)
     SectionCard(title = "Результат") {

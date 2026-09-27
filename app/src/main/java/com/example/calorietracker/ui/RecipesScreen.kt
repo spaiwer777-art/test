@@ -45,7 +45,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -140,7 +140,7 @@ internal fun RecipesContent(
         ) {
             if (worldPane != null) item { toggle() }
             item {
-                OutlinedTextField(
+                AppTextField(
                     value = query,
                     onValueChange = onQuery,
                     placeholder = { Text("Поиск рецептов") },

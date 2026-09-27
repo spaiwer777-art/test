@@ -37,7 +37,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -607,7 +607,7 @@ private fun WeightDialog(initial: Double?, onDismiss: () -> Unit, onSave: (Doubl
         onDismissRequest = onDismiss,
         title = { Text("Вес сегодня") },
         text = {
-            OutlinedTextField(
+            AppTextField(
                 value = text,
                 onValueChange = { text = it },
                 suffix = { Text("кг") },

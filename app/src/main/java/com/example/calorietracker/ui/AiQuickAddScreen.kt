@@ -37,7 +37,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -111,7 +111,7 @@ fun AiQuickAddScreen(
         ) {
             Text("Опиши, что съел, обычными словами", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
+            AppTextField(
                 value = description,
                 onValueChange = { description = it },
                 placeholder = { Text("например: омлет из 2 яиц и тост с маслом") },
@@ -271,7 +271,7 @@ private fun IngredientEditRow(item: AiIngredient, onGrams: (Double) -> Unit, onR
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
             )
         }
-        OutlinedTextField(
+        AppTextField(
             value = text,
             onValueChange = { v -> text = v; v.toNumberOrNull()?.let(onGrams) },
             suffix = { Text("г") },

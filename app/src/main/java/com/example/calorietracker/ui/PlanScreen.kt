@@ -33,7 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -144,7 +144,7 @@ internal fun PlanContent(
                         Switch(checked = snack, onCheckedChange = { snack = it })
                     }
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
+                    AppTextField(
                         value = prefs,
                         onValueChange = { prefs = it },
                         label = { Text("Пожелания для ИИ") },

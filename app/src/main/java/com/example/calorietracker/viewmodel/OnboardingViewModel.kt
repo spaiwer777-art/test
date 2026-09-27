@@ -37,6 +37,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             val p = profile.value
             graph.settings.setProfile(p)
             graph.settings.setDailyGoal(calories())
+            graph.settings.setCalorieAuto(true)
             graph.settings.setActiveDiet(diets.value.firstOrNull { it.id == dietId.value })
             graph.tracking.setWeight(LocalDate.now().toEpochDay(), p.weightKg)
             graph.settings.setOnboarded(true)

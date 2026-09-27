@@ -22,7 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -202,7 +202,7 @@ internal fun RecipeDetailsContent(
                 }
                 Spacer(Modifier.height(12.dp))
                 if (byGrams) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = gramsText,
                         onValueChange = { gramsText = it; it.toNumberOrNull()?.let { g -> if (servingWeight > 0) portions = g / servingWeight } },
                         label = { Text("Сколько грамм съел") },

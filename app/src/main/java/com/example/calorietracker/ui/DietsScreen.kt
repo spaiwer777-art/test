@@ -44,7 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SuggestionChip
@@ -319,9 +319,9 @@ fun DietEditorScreen(onSaved: (Long) -> Unit, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             SectionCard(title = "Основное") {
-                OutlinedTextField(name, { vm.name.value = it }, label = { Text("Название") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                AppTextField(name, { vm.name.value = it }, label = { Text("Название") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(description, { vm.description.value = it }, label = { Text("Описание") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                AppTextField(description, { vm.description.value = it }, label = { Text("Описание") }, minLines = 2, modifier = Modifier.fillMaxWidth())
             }
             SectionCard(title = "БЖУ", subtitle = "Доля калорий. Углеводы — остаток до 100%") {
                 PercentSlider("Белки", protein, 10..60) { vm.protein.value = it.coerceAtMost(100 - fat) }
@@ -345,10 +345,10 @@ fun DietEditorScreen(onSaved: (Long) -> Unit, onBack: () -> Unit) {
                 }
             }
             SectionCard(title = "Правила", subtitle = "Каждый совет — с новой строки") {
-                OutlinedTextField(recommended, { vm.recommended.value = it }, minLines = 3, modifier = Modifier.fillMaxWidth())
+                AppTextField(recommended, { vm.recommended.value = it }, minLines = 3, modifier = Modifier.fillMaxWidth())
             }
             SectionCard(title = "Исключить продукты", subtitle = "Через запятую: сахар, хлеб, картоф… Слово ищется в начале слов названия") {
-                OutlinedTextField(
+                AppTextField(
                     avoid, { vm.avoid.value = it }, minLines = 2, modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions()
                 )

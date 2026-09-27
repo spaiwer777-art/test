@@ -157,6 +157,23 @@ class ScreenshotTest {
         AuthContent(true, true, AccountStatus.Idle, SignedIn("anna@mail.ru", true), { _, _ -> }, { _, _ -> }, {}, {}, {}, {})
     }
 
+    @Test fun profile() = themed(dark = false, tall = true) {
+        ProfileContent(
+            com.example.calorietracker.viewmodel.ProfileUiState(
+                profile = Profile(weightKg = 82.0), dailyGoal = 2350.0, calorieAuto = true, suggestedCalories = 2350.0,
+                ownWaterMl = 2500, suggestedWaterMl = 2450
+            ),
+            {}, {}, {}, {}, {}
+        )
+    }
+
+    @Test fun profileDark() = themed(dark = true) {
+        ProfileContent(
+            com.example.calorietracker.viewmodel.ProfileUiState(profile = Profile(), dailyGoal = 2100.0, suggestedCalories = 2280.0),
+            {}, {}, {}, {}, {}
+        )
+    }
+
     @Test fun onboardingAbout() = themed(dark = false) {
         OnboardingContent(Profile(), {}, sampleDiets, 0, {}, 2100.0, {}, {}, {})
     }

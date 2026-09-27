@@ -25,6 +25,10 @@ fun dietCalories(profile: Profile, diet: Diet): Double {
     return (maxOf(kcal, floor) / 10).roundToInt() * 10.0
 }
 
+/** Daily calories for the profile: diet-adjusted when a diet is active, else the goal-based target. */
+fun suggestedCalories(profile: Profile, diet: Diet?): Double =
+    if (diet != null) dietCalories(profile, diet) else (Calc.calorieTarget(profile) / 10).roundToInt() * 10.0
+
 class DietsViewModel(application: Application) : AndroidViewModel(application) {
     private val graph = application.graph
     val diets: StateFlow<List<Diet>> = graph.diets.all()

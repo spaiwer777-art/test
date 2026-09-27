@@ -49,7 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -224,7 +224,7 @@ private fun AuthForm(
     }
 
     val fieldShape = RoundedCornerShape(16.dp)
-    OutlinedTextField(
+    AppTextField(
         email, { email = it.trim() },
         label = { Text("Email") },
         leadingIcon = { Icon(Icons.Filled.Email, null) },
@@ -233,7 +233,7 @@ private fun AuthForm(
         modifier = Modifier.fillMaxWidth()
     )
     Spacer(Modifier.height(10.dp))
-    OutlinedTextField(
+    AppTextField(
         password, { password = it },
         label = { Text("Пароль") },
         supportingText = if (!login) ({ Text("Не меньше 6 символов") }) else null,

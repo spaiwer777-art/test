@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -43,6 +44,7 @@ fun MoreScreen(
     onAccount: () -> Unit,
     onCalculators: () -> Unit,
     onSettings: () -> Unit,
+    onProfile: () -> Unit = {},
     bottomBar: @Composable () -> Unit
 ) {
     Scaffold(
@@ -54,11 +56,12 @@ fun MoreScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             val accent = MaterialTheme.colorScheme.primary
+            MoreItem(Icons.Filled.Person, "О себе", "Рост, вес, активность, цель, нормы калорий и воды", onProfile)
             MoreItem(Icons.Filled.CloudSync, "Аккаунт и резервная копия", "Вход, сохранение прогресса и перенос на другой телефон", onAccount)
             MoreItem(Icons.Filled.Eco, "Диеты", "Готовые диеты и конструктор своей: БЖУ, калории, правила", onDiets)
             MoreItem(Icons.Filled.EventNote, "Рацион", "План питания на 1–7 дней: с ИИ или из рецептов", onPlan)
             MoreItem(Icons.Filled.Calculate, "Калькуляторы", "Норма калорий, ИМТ, вода, БЖУ, % жира, идеальный вес, тренировки", onCalculators)
-            MoreItem(Icons.Filled.Settings, "Настройки", "Тема, цвета, цель, ключ Groq", onSettings)
+            MoreItem(Icons.Filled.Settings, "Настройки", "Тема, цвета, ключ Groq", onSettings)
             SectionCard(title = "Откуда данные") {
                 Row {
                     Icon(Icons.Filled.Info, null, tint = accent)

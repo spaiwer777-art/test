@@ -39,7 +39,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -70,6 +70,7 @@ import com.example.calorietracker.data.WeightGoal
 import com.example.calorietracker.data.split
 import com.example.calorietracker.ui.components.AnimatedNumber
 import com.example.calorietracker.ui.components.MacroDonut
+import com.example.calorietracker.ui.components.NumberField
 import com.example.calorietracker.ui.components.formatGrams
 import com.example.calorietracker.ui.components.toNumberOrNull
 import com.example.calorietracker.viewmodel.AccountViewModel
@@ -204,9 +205,9 @@ private fun AboutYou(p: Profile, onChange: (Profile) -> Unit) {
     }
     Spacer(Modifier.height(16.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Num("Возраст", p.age.toDouble(), Modifier.weight(1f)) { onChange(p.copy(age = it.roundToInt().coerceIn(14, 100))) }
-        Num("Рост, см", p.heightCm, Modifier.weight(1f)) { onChange(p.copy(heightCm = it.coerceIn(120.0, 230.0))) }
-        Num("Вес, кг", p.weightKg, Modifier.weight(1f)) { onChange(p.copy(weightKg = it.coerceIn(30.0, 300.0))) }
+        NumberField("Возраст", p.age.toDouble(), { onChange(p.copy(age = it.roundToInt())) }, Modifier.weight(1f), range = 14.0..100.0, decimals = false)
+        NumberField("Рост, см", p.heightCm, { onChange(p.copy(heightCm = it)) }, Modifier.weight(1f), range = 120.0..230.0)
+        NumberField("Вес, кг", p.weightKg, { onChange(p.copy(weightKg = it)) }, Modifier.weight(1f), range = 30.0..300.0)
     }
     Spacer(Modifier.height(20.dp))
     Text("Активность", style = MaterialTheme.typography.titleSmall, modifier = Modifier.fillMaxWidth())
@@ -228,19 +229,6 @@ private fun AboutYou(p: Profile, onChange: (Profile) -> Unit) {
             }
         }
     }
-}
-
-@Composable
-private fun Num(label: String, value: Double, modifier: Modifier, onValue: (Double) -> Unit) {
-    var text by remember(label) { mutableStateOf(formatGrams(value)) }
-    OutlinedTextField(
-        value = text,
-        onValueChange = { v -> text = v; v.toNumberOrNull()?.let(onValue) },
-        label = { Text(label) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        modifier = modifier
-    )
 }
 
 @Composable

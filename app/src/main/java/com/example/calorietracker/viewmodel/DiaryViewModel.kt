@@ -112,10 +112,26 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
         .flatMapLatest { day -> tracking.water(day).map { it?.ml ?: 0 } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    /** Water goal from the latest logged weight (or the profile weight). */
-    val waterGoalMl: StateFlow<Int> = combine(settingsRepo.profile, tracking.latestWeight()) { profile, w ->
-        Calc.waterMl(w?.kg ?: profile.weightKg, profile.activity)
+    /** Water goal: the user's own value, or from the latest logged weight (or the profile weight). */
+    val waterGoalMl: StateFlow<Int> = combine(settingsRepo.profile, tracking.latestWeight(), settingsRepo.waterGoalMl) { profile, w, own ->
+        if (own > 0) own else Calc.waterMl(w?.kg ?: profile.weightKg, profile.activity)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2000)
+
+    /** Calorie goal the profile (and active diet) suggests, offered when editing the goal. */
+    val suggestedGoal: StateFlow<Double> = combine(settingsRepo.profile, tracking.latestWeight(), activeDiet) { profile, w, diet ->
+        suggestedCalories(profile.copy(weightKg = w?.kg ?: profile.weightKg), diet)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2000.0)
+
+    fun setDailyGoal(kcal: Double) {
+        viewModelScope.launch {
+            settingsRepo.setCalorieAuto(false)
+            settingsRepo.setDailyGoal(kcal)
+        }
+    }
+
+    fun setWaterGoal(ml: Int) {
+        viewModelScope.launch { settingsRepo.setWaterGoalMl(ml) }
+    }
 
     fun setWater(ml: Int) {
         val day = selectedEpochDay.value

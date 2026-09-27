@@ -70,8 +70,23 @@ class SettingsRepository(private val context: Context) {
     private val cloudSessionKey = stringPreferencesKey("cloud_session")
     private val cloudLastSyncKey = longPreferencesKey("cloud_last_sync")
     private val cloudAutoKey = booleanPreferencesKey("cloud_auto")
+    private val waterGoalKey = intPreferencesKey("water_goal_ml")
+    private val calorieAutoKey = booleanPreferencesKey("calorie_auto")
 
     val dailyGoal: Flow<Double> = context.dataStore.data.map { it[dailyGoalKey] ?: 2000.0 }
+    /** Own daily water goal in ml; 0 = calculate from weight and activity. */
+    val waterGoalMl: Flow<Int> = context.dataStore.data.map { it[waterGoalKey] ?: 0 }
+    /** Recalculate the calorie goal whenever the profile changes. */
+    val calorieAuto: Flow<Boolean> = context.dataStore.data.map { it[calorieAutoKey] ?: false }
+
+    suspend fun setWaterGoalMl(value: Int) {
+        context.dataStore.edit { it[waterGoalKey] = value.coerceAtLeast(0) }
+    }
+
+    suspend fun setCalorieAuto(value: Boolean) {
+        context.dataStore.edit { it[calorieAutoKey] = value }
+    }
+
     val groqApiKey: Flow<String> = context.dataStore.data.map { it[groqApiKeyKey] ?: "" }
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         prefs[themeModeKey]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM
@@ -183,6 +198,8 @@ class SettingsRepository(private val context: Context) {
             values["active_diet"]?.toLongOrNull()?.let { prefs[activeDietKey] = it }
             values["macro_split"]?.let { prefs[splitKey] = it }
             values["macro_grams"]?.let { prefs[macroGramsKey] = it }
+            values["water_goal_ml"]?.toIntOrNull()?.let { prefs[waterGoalKey] = it }
+            values["calorie_auto"]?.toBooleanStrictOrNull()?.let { prefs[calorieAutoKey] = it }
             prefs[onboardedKey] = true
         }
     }

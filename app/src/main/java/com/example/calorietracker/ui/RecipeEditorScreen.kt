@@ -31,7 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -81,7 +81,7 @@ fun RecipeEditorScreen(onSaved: (Long) -> Unit, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             SectionCard(title = "Основное") {
-                OutlinedTextField(name, { vm.name.value = it }, label = { Text("Название") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                AppTextField(name, { vm.name.value = it }, label = { Text("Название") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RECIPE_CATEGORIES.forEach { c ->
@@ -111,7 +111,7 @@ fun RecipeEditorScreen(onSaved: (Long) -> Unit, onBack: () -> Unit) {
                             Text(ing.name, style = MaterialTheme.typography.bodyLarge)
                             Text("${ing.calories.roundToInt()} ккал", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        OutlinedTextField(
+                        AppTextField(
                             value = text,
                             onValueChange = { v -> text = v; v.toNumberOrNull()?.let { vm.setIngredientGrams(i, it) } },
                             suffix = { Text("г") },
@@ -135,7 +135,7 @@ fun RecipeEditorScreen(onSaved: (Long) -> Unit, onBack: () -> Unit) {
             }
 
             SectionCard(title = "Приготовление", subtitle = "Каждый шаг — с новой строки") {
-                OutlinedTextField(
+                AppTextField(
                     value = steps,
                     onValueChange = { vm.steps.value = it },
                     minLines = 4,
@@ -184,7 +184,7 @@ private fun WholeDishCard(
             color = MaterialTheme.colorScheme.onPrimaryContainer
         )
         Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
+        AppTextField(
             value = cookedWeight,
             onValueChange = onCookedWeight,
             label = { Text("Вес готового блюда, г (необязательно)") },
@@ -211,7 +211,7 @@ private fun WholeDishCard(
 @Composable
 private fun NumberField(label: String, value: String, modifier: Modifier, key: Any? = null, onChange: (String) -> Unit) {
     var text by remember(key) { mutableStateOf(value) }
-    OutlinedTextField(
+    AppTextField(
         value = text,
         onValueChange = { text = it; onChange(it) },
         label = { Text(label) },
@@ -235,7 +235,7 @@ private fun IngredientPicker(vm: RecipeEditorViewModel, onDismiss: () -> Unit) {
         text = {
             if (food == null) {
                 Column {
-                    OutlinedTextField(
+                    AppTextField(
                         value = query,
                         onValueChange = { vm.foodQuery.value = it },
                         placeholder = { Text("Поиск продукта") },
@@ -253,7 +253,7 @@ private fun IngredientPicker(vm: RecipeEditorViewModel, onDismiss: () -> Unit) {
                     }
                 }
             } else {
-                OutlinedTextField(
+                AppTextField(
                     value = grams,
                     onValueChange = { grams = it },
                     label = { Text("Граммы") },

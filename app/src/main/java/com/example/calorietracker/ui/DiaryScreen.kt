@@ -19,6 +19,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.remember
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -43,7 +44,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.calorietracker.data.MacroGrams
 import androidx.compose.foundation.Canvas
@@ -145,6 +146,7 @@ fun DiaryScreen(
     onAiQuickAdd: (day: Long, meal: MealType) -> Unit,
     onOpenFood: (foodId: Long, day: Long, meal: MealType) -> Unit,
     onOpenRecipe: (recipeId: Long, day: Long, meal: MealType) -> Unit,
+    onOpenProfile: () -> Unit = {},
     bottomBar: @Composable () -> Unit
 ) {
     val viewModel: DiaryViewModel = viewModel()
@@ -153,6 +155,7 @@ fun DiaryScreen(
     val photos by viewModel.photos.collectAsState()
     val water by viewModel.waterMl.collectAsState()
     val waterGoal by viewModel.waterGoalMl.collectAsState()
+    val suggested by viewModel.suggestedGoal.collectAsState()
     val requestPhoto = rememberMealPhotoPicker(viewModel::addPhoto)
     DiaryContent(
         state = state,
@@ -166,6 +169,10 @@ fun DiaryScreen(
         onDelete = viewModel::deleteEntry,
         onSetWater = viewModel::setWater,
         onSetMacros = viewModel::setCustomMacros,
+        suggestedGoal = suggested,
+        onSetGoal = viewModel::setDailyGoal,
+        onSetWaterGoal = viewModel::setWaterGoal,
+        onOpenProfile = onOpenProfile,
         onRequestPhoto = requestPhoto,
         onDeletePhoto = viewModel::deletePhoto,
         onAddFood = onAddFood,
@@ -191,6 +198,10 @@ internal fun DiaryContent(
     onDelete: (Long) -> Unit,
     onSetWater: (Int) -> Unit,
     onSetMacros: (MacroGrams?, Boolean) -> Unit = { _, _ -> },
+    suggestedGoal: Double = 0.0,
+    onSetGoal: (Double) -> Unit = {},
+    onSetWaterGoal: (Int) -> Unit = {},
+    onOpenProfile: () -> Unit = {},
     onRequestPhoto: (MealType, fromCamera: Boolean) -> Unit,
     onDeletePhoto: (MealPhoto) -> Unit,
     onAddFood: (day: Long, meal: MealType) -> Unit,
@@ -203,6 +214,8 @@ internal fun DiaryContent(
     var sheetEntry by remember { mutableStateOf<DiaryEntry?>(null) }
     var viewedPhoto by remember { mutableStateOf<MealPhoto?>(null) }
     var editMacros by remember { mutableStateOf(false) }
+    var editGoal by remember { mutableStateOf(false) }
+    var editWater by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -244,7 +257,7 @@ internal fun DiaryContent(
                     onToday = onToday
                 )
             }
-            item { SummaryCard(state, onEditMacros = { editMacros = true }) }
+            item { SummaryCard(state, onEditMacros = { editMacros = true }, onEditGoal = { editGoal = true }) }
             items(MealType.entries, key = { it.name }) { meal ->
                 MealCard(
                     meal = meal,
@@ -257,7 +270,7 @@ internal fun DiaryContent(
                     onPhotoClick = { viewedPhoto = it }
                 )
             }
-            item(key = "water") { WaterCard(waterMl, waterGoalMl, onSetWater) }
+            item(key = "water") { WaterCard(waterMl, waterGoalMl, onSetWater, onEditGoal = { editWater = true }) }
         }
     }
 
@@ -276,6 +289,37 @@ internal fun DiaryContent(
             state = state,
             onDismiss = { editMacros = false },
             onSave = { grams, alsoCalories -> onSetMacros(grams, alsoCalories); editMacros = false }
+        )
+    }
+    if (editGoal) {
+        GoalDialog(
+            title = "Норма калорий",
+            icon = Icons.Filled.LocalFireDepartment,
+            current = state.dailyGoal,
+            suggested = suggestedGoal,
+            suggestedLabel = "По профилю" + (state.dietName?.let { " и диете" } ?: ""),
+            unit = "ккал",
+            range = 800.0..6000.0,
+            quick = emptyList(),
+            onDismiss = { editGoal = false },
+            onOpenProfile = { editGoal = false; onOpenProfile() },
+            onSave = { onSetGoal(it); editGoal = false }
+        )
+    }
+    if (editWater) {
+        GoalDialog(
+            title = "Норма воды",
+            icon = Icons.Filled.WaterDrop,
+            current = waterGoalMl.toDouble(),
+            suggested = null,
+            suggestedLabel = "",
+            unit = "мл",
+            range = 500.0..6000.0,
+            quick = listOf(1500.0, 2000.0, 2500.0, 3000.0),
+            onDismiss = { editWater = false },
+            onOpenProfile = { editWater = false; onOpenProfile() },
+            onSave = { onSetWaterGoal(it.roundToInt()); editWater = false },
+            onAuto = { onSetWaterGoal(0); editWater = false }
         )
     }
     viewedPhoto?.let { photo ->
@@ -391,7 +435,7 @@ private fun DayCell(date: LocalDate, progress: Float, selected: Boolean, isToday
 }
 
 @Composable
-private fun SummaryCard(state: DiaryUiState, onEditMacros: () -> Unit = {}) {
+private fun SummaryCard(state: DiaryUiState, onEditMacros: () -> Unit = {}, onEditGoal: () -> Unit = {}) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -405,7 +449,8 @@ private fun SummaryCard(state: DiaryUiState, onEditMacros: () -> Unit = {}) {
             CalorieSummary(
                 caloriesByMeal = MealType.entries.associateWith { state.caloriesFor(it) },
                 goal = state.dailyGoal,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                onGoalClick = onEditGoal
             )
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -539,18 +584,25 @@ private val WaterBlueDark = Color(0xFF3987E5)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WaterCard(ml: Int, goalMl: Int, onSet: (Int) -> Unit) {
+private fun WaterCard(ml: Int, goalMl: Int, onSet: (Int) -> Unit, onEditGoal: () -> Unit = {}) {
     val glass = 250
     val cups = ((goalMl + glass - 1) / glass).coerceIn(4, 14)
     val filled = ml / glass
     val water = if (isDarkSurface()) WaterBlueDark else WaterBlueLight
     SectionCard(
         title = "Вода",
-        subtitle = "Стакан — 250 мл. Норма рассчитана по весу и активности",
+        subtitle = "Стакан — 250 мл. Нажми на норму, чтобы изменить",
         action = {
-            Column(horizontalAlignment = Alignment.End) {
+            Column(
+                Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onEditGoal).padding(horizontal = 6.dp, vertical = 2.dp),
+                horizontalAlignment = Alignment.End
+            ) {
                 AnimatedNumber(ml, MaterialTheme.typography.titleLarge)
-                Text("из $goalMl мл", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("из $goalMl мл", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(3.dp))
+                    Icon(Icons.Filled.Edit, "Изменить норму", Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
+                }
             }
         }
     ) {
@@ -756,9 +808,9 @@ private fun MacroGoalsDialog(state: DiaryUiState, onDismiss: () -> Unit, onSave:
                 Text("Граммы в день. Калории посчитаются сами: белки и углеводы по 4 ккал, жиры по 9.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(12.dp))
                 val kb = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                OutlinedTextField(p, { p = it }, label = { Text("Белки, г") }, singleLine = true, keyboardOptions = kb)
-                OutlinedTextField(f, { f = it }, label = { Text("Жиры, г") }, singleLine = true, keyboardOptions = kb)
-                OutlinedTextField(c, { c = it }, label = { Text("Углеводы, г") }, singleLine = true, keyboardOptions = kb)
+                AppTextField(p, { p = it }, label = { Text("Белки, г") }, singleLine = true, keyboardOptions = kb)
+                AppTextField(f, { f = it }, label = { Text("Жиры, г") }, singleLine = true, keyboardOptions = kb)
+                AppTextField(c, { c = it }, label = { Text("Углеводы, г") }, singleLine = true, keyboardOptions = kb)
                 Spacer(Modifier.height(12.dp))
                 Text("= ${kcal.roundToInt()} ккал", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -773,6 +825,77 @@ private fun MacroGoalsDialog(state: DiaryUiState, onDismiss: () -> Unit, onSave:
         confirmButton = {
             TextButton(enabled = valid && kcal > 0, onClick = { onSave(MacroGrams(grams[0]!!, grams[1]!!, grams[2]!!), alsoCalories) }) { Text("Сохранить") }
         },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+}
+
+/** Edit a daily norm (calories or water) in place, with an optional suggested value and presets. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GoalDialog(
+    title: String,
+    icon: ImageVector,
+    current: Double,
+    suggested: Double?,
+    suggestedLabel: String,
+    unit: String,
+    range: ClosedFloatingPointRange<Double>,
+    quick: List<Double>,
+    onDismiss: () -> Unit,
+    onOpenProfile: () -> Unit,
+    onSave: (Double) -> Unit,
+    onAuto: (() -> Unit)? = null
+) {
+    var value by remember { mutableStateOf(current) }
+    // Bumped to push a preset into the field (it only re-syncs from outside while unfocused).
+    var fieldKey by remember { mutableStateOf(0) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(icon, null, tint = MaterialTheme.colorScheme.primary) },
+        title = { Text(title) },
+        text = {
+            Column {
+                androidx.compose.runtime.key(fieldKey) {
+                    com.example.calorietracker.ui.components.NumberField(
+                        "В день", value, { value = it }, Modifier.fillMaxWidth(),
+                        unit = unit, range = range, decimals = false, imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                    )
+                }
+                if (suggested != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        onClick = { value = suggested; fieldKey++ },
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(suggestedLabel, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${suggested.roundToInt()} $unit", style = MaterialTheme.typography.titleMedium)
+                            }
+                            Text("Взять", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+                if (quick.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        quick.forEach { q ->
+                            FilterChip(
+                                selected = value == q, onClick = { value = q; fieldKey++ },
+                                label = { Text("${com.example.calorietracker.ui.components.formatOneDecimal(q / 1000)} л") }
+                            )
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onOpenProfile) { Text("Все параметры — «О себе»") }
+                    if (onAuto != null) TextButton(onClick = onAuto) { Text("Авто") }
+                }
+            }
+        },
+        confirmButton = { TextButton(enabled = value in range, onClick = { onSave(value) }) { Text("Сохранить") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
 }

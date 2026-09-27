@@ -30,6 +30,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
@@ -38,7 +40,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -66,25 +68,21 @@ import com.example.calorietracker.data.AccentColor
 import com.example.calorietracker.data.ThemeMode
 import com.example.calorietracker.ui.theme.isDarkSurface
 import com.example.calorietracker.ui.theme.swatch
-import com.example.calorietracker.viewmodel.MacroGoals
 import com.example.calorietracker.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onOpenProfile: () -> Unit) {
     val vm: SettingsViewModel = viewModel()
     val goal by vm.dailyGoal.collectAsState()
     val apiKey by vm.groqApiKey.collectAsState()
     val themeMode by vm.themeMode.collectAsState()
     val accent by vm.accent.collectAsState()
     val dynamicColor by vm.dynamicColor.collectAsState()
-    val split by vm.macroSplit.collectAsState()
 
-    var goalText by remember(goal) { mutableStateOf(goal.roundToInt().toString()) }
     var apiKeyText by remember(apiKey) { mutableStateOf(apiKey) }
-    var goalSaved by remember { mutableStateOf(false) }
     var keySaved by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -148,26 +146,27 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            Section("Цель на день") {
-                OutlinedTextField(
-                    value = goalText,
-                    onValueChange = { goalText = it.filter(Char::isDigit).take(5) },
-                    label = { Text("Ккал в день") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                val macros = MacroGoals.fromCalories(goalText.toDoubleOrNull() ?: goal, split)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Нормы БЖУ: белки ${macros.protein.roundToInt()} г · жиры ${macros.fat.roundToInt()} г · углеводы ${macros.carbs.roundToInt()} г",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-                SaveRow("Сохранить цель", goalSaved, onSaved = { goalSaved = false }) {
-                    vm.setDailyGoal(goalText.toDoubleOrNull()?.takeIf { it > 0 } ?: 2000.0)
-                    goalSaved = true
+            Card(
+                onClick = onOpenProfile,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Icons.Filled.Person, null, tint = MaterialTheme.colorScheme.primary) }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("О себе", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Рост, вес, цель · норма ${goal.roundToInt()} ккал и воды",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
 
@@ -178,7 +177,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
+                AppTextField(
                     value = apiKeyText,
                     onValueChange = { apiKeyText = it },
                     label = { Text("Groq API-ключ") },

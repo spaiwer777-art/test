@@ -43,7 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.example.calorietracker.ui.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -106,7 +106,7 @@ internal fun WorldRecipesGrid(
     ) {
         item(span = { GridItemSpan(2) }) { header() }
         item(span = { GridItemSpan(2) }) {
-            OutlinedTextField(
+            AppTextField(
                 value = query,
                 onValueChange = onQuery,
                 placeholder = { Text("Поиск по-английски: soup, chicken, cake…") },
