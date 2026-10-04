@@ -59,7 +59,7 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
   </div>
   <div class="row">
     <label><input type="checkbox" id="loop" checked> Повторять</label>
-    <label>пауза <input type="number" id="pause" min="0" max="60000" step="100" value="1000"> мс</label>
+    <label>пауза <input type="number" id="pause" min="0" max="10000" step="100" value="1000"> мс</label>
   </div>
 </section>
 
@@ -91,6 +91,7 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
     <p><b>RTTTL</b> (рингтоны Nokia): <code>Имя:d=4,o=5,b=120:8e6,8d#6,…</code>. Тысячи готовых мелодий находятся поиском «rtttl collection».</p>
     <p><b>MIDI</b> (.mid): из нескольких голосов берётся самая верхняя нота (обычно это мелодия). Ударные пропускаются. Если звучит не то, выберите отдельную дорожку.</p>
     <p>Пьезо/динамик играет один голос, на плату влезает до <span id="maxN">1500</span> нот.</p>
+    <p><b>Защита платы:</b> ток пина ограничен в прошивке (~10 мА), громкость не выше 50 % ШИМ, ноты вне 100–8000 Гц переносятся по октаве, длина ноты 10 мс – 10 с, пауза до 10 с.</p>
   </details>
 </section>
 </main>
@@ -107,7 +108,8 @@ const PRESETS = {
 };
 
 let midiData = null;   // parsed MIDI {name, tracks:[{name, segs}]}
-let maxNotes = 1500;
+// Safety limits; the real values come from the board in /api/status.
+let lim = { maxNotes: 1500, maxVol: 100, minFreq: 100, maxFreq: 8000, minNoteMs: 10, maxNoteMs: 10000, maxPause: 10000 };
 
 function msg(text, kind) { const m = $("msg"); m.textContent = text; m.className = "msg " + (kind || ""); }
 const midiToFreq = n => Math.round(440 * Math.pow(2, (n - 69) / 12));
@@ -244,7 +246,7 @@ function monophonic(segs) {
     d = Math.round(d);
     if (d < 15) { if (res.length) res[res.length - 1][1] += d; return; }
     const f = p ? midiToFreq(p) : 0;
-    while (d > 60000) { res.push([f, 60000]); d -= 60000; }
+    while (d > lim.maxNoteMs) { res.push([f, lim.maxNoteMs]); d -= lim.maxNoteMs; }
     res.push([f, d]);
   });
   return res;
@@ -264,10 +266,35 @@ function currentSong() {
   return parseRTTTL(text);
 }
 
+// Bring notes into the board's safe range (same rules as the firmware), so
+// the browser preview sounds exactly like the speaker.
+function safeNotes(notes) {
+  const out = [];
+  let moved = 0;
+  notes.forEach(([f, ms]) => {
+    if (f > 0) {
+      const f0 = f;
+      while (f < lim.minFreq) f *= 2;
+      while (f > lim.maxFreq) f /= 2;
+      f = Math.round(f);
+      if (f !== f0) moved++;
+    } else f = 0;
+    ms = Math.round(ms);
+    if (ms < lim.minNoteMs) { if (out.length) out[out.length - 1][1] = Math.min(lim.maxNoteMs, out[out.length - 1][1] + ms); return; }
+    if (f === 0) { while (ms > lim.maxNoteMs) { out.push([0, lim.maxNoteMs]); ms -= lim.maxNoteMs; } }
+    out.push([f, Math.min(ms, lim.maxNoteMs)]);
+  });
+  return { notes: out, moved };
+}
+
 function prepared() {
   const s = currentSong();
+  const safe = safeNotes(s.notes);
+  s.notes = safe.notes;
   let warn = "";
-  if (s.notes.length > maxNotes) { warn = ` Обрезано до ${maxNotes} нот из ${s.notes.length}.`; s.notes = s.notes.slice(0, maxNotes); }
+  if (safe.moved) warn += ` ${safe.moved} нот перенесено по октаве в диапазон ${lim.minFreq}–${lim.maxFreq} Гц.`;
+  if (s.notes.length > lim.maxNotes) { warn += ` Обрезано до ${lim.maxNotes} нот из ${s.notes.length}.`; s.notes = s.notes.slice(0, lim.maxNotes); }
+  s.name = s.name.slice(0, 20);
   s.warn = warn;
   return s;
 }
@@ -303,7 +330,10 @@ async function api(path, opts) {
   const st = JSON.parse(text); showStatus(st); return st;
 }
 function settingsQuery() {
-  return `loop=${$("loop").checked ? 1 : 0}&pause=${$("pause").value || 0}&vol=${$("vol").value}`;
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round(+v || 0)));
+  const pause = clamp($("pause").value, 0, lim.maxPause);
+  const vol = clamp($("vol").value, 1, lim.maxVol);
+  return `loop=${$("loop").checked ? 1 : 0}&pause=${pause}&vol=${vol}`;
 }
 async function send() {
   let s;
@@ -321,7 +351,9 @@ async function send() {
 
 let editing = false;
 function showStatus(st) {
-  maxNotes = st.maxNotes; $("maxN").textContent = st.maxNotes;
+  ["maxNotes", "maxVol", "minFreq", "maxFreq", "minNoteMs", "maxNoteMs", "maxPause"].forEach(k => { if (st[k] !== undefined) lim[k] = st[k]; });
+  $("maxN").textContent = lim.maxNotes;
+  $("vol").max = lim.maxVol; $("pause").max = lim.maxPause;
   $("stName").textContent = st.name || "—";
   $("stInfo").textContent = `${st.playing ? "играет" : "остановлено"} · ${st.notes} нот · ${fmtTime(st.durationMs)}`;
   $("stBar").style.width = (st.playing && st.notes ? Math.min(100, st.index / st.notes * 100) : 0) + "%";

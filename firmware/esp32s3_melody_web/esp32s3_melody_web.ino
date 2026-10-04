@@ -13,6 +13,7 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <Preferences.h>
+#include <driver/gpio.h>
 #include "page.h"
 
 #define SPEAKER_PIN 4
@@ -21,7 +22,40 @@ const char *AP_SSID = "ESP32-Melody";
 const char *AP_PASS = "melody123";  // at least 8 characters
 const IPAddress AP_IP(192, 168, 4, 1);
 
+// ---------------------------------------------------------------------------
+// Safety limits. The speaker (16 ohm) is wired straight to the pin with no
+// resistor, so the pin itself must limit the current.
+
+// Pad drive strength of GPIO4: CAP_0 ~5 mA, CAP_1 ~10 mA, CAP_2 ~20 mA
+// (ESP32 default), CAP_3 ~40 mA (absolute maximum, never use it here).
+// CAP_1 keeps the pin well inside its rating; CAP_2 is louder and still in
+// spec. Do not go higher without a series resistor or a transistor.
+const gpio_drive_cap_t SPEAKER_DRIVE = GPIO_DRIVE_CAP_1;
+
+// Volume 100 % = 50 % PWM duty (a square wave); never more, so the pin is
+// high at most half of the time.
+const uint8_t MAX_VOLUME = 100;
+const uint8_t DEFAULT_VOLUME = 50;
+
+// Notes outside this range are moved by octaves into it: a tiny speaker
+// cannot reproduce them anyway, and very low tones mean long high pulses.
+const uint16_t MIN_FREQ = 100;
+const uint16_t MAX_FREQ = 8000;
+
+const uint16_t MIN_NOTE_MS = 10;
+const uint16_t MAX_NOTE_MS = 10000;
+const uint16_t MAX_PAUSE_MS = 10000;
 const size_t MAX_NOTES = 1500;
+const size_t MAX_NAME_LEN = 40;
+const size_t MAX_BODY_LEN = MAX_NOTES * 12;  // "8000,10000;" per note + slack
+
+// Settings are written to flash only after they stop changing for this long,
+// so dragging the volume slider does not wear the flash.
+const uint32_t SETTINGS_SAVE_DELAY_MS = 3000;
+
+// Lower Wi-Fi TX power: the access point is used at arm's length, and the
+// Super Mini (small LDO, chip antenna) runs cooler and avoids brown-outs.
+const wifi_power_t WIFI_TX_POWER = WIFI_POWER_8_5dBm;
 
 struct Note {
   uint16_t freq;  // Hz, 0 = rest
@@ -33,7 +67,7 @@ size_t songLen = 0;
 String songName;
 bool loopSong = true;
 uint16_t pauseMs = 1000;
-uint8_t volume = 50;  // 1..100 %
+uint8_t volume = DEFAULT_VOLUME;  // 1..MAX_VOLUME %
 
 WebServer server(80);
 DNSServer dns;
@@ -105,10 +139,31 @@ static bool reached(uint32_t t) { return (int32_t)(millis() - t) >= 0; }
 
 void speakerOff() { ledcWrite(SPEAKER_PIN, 0); }
 
+uint16_t safeFreq(long f) {
+  if (f <= 0) return 0;
+  while (f < MIN_FREQ) f *= 2;
+  while (f > MAX_FREQ) f /= 2;
+  return f;
+}
+
+uint16_t safeMs(long ms) { return constrain(ms, MIN_NOTE_MS, MAX_NOTE_MS); }
+
+uint8_t safeVolume(long v) { return constrain(v, 1, MAX_VOLUME); }
+
+uint16_t safePause(long ms) { return constrain(ms, 0, MAX_PAUSE_MS); }
+
+// Cut to MAX_NAME_LEN bytes without splitting a multi-byte UTF-8 character.
+String safeName(const String &s) {
+  if (s.length() <= MAX_NAME_LEN) return s;
+  size_t n = MAX_NAME_LEN;
+  while (n > 0 && ((uint8_t)s[n] & 0xC0) == 0x80) n--;
+  return s.substring(0, n);
+}
+
 void speakerOn(uint16_t freq) {
-  ledcWriteTone(SPEAKER_PIN, freq);
+  ledcWriteTone(SPEAKER_PIN, safeFreq(freq));
   // ledcWriteTone sets 50 % duty (0x1FF of 10 bits); scale it for volume.
-  ledcWrite(SPEAKER_PIN, (uint32_t)0x1FF * volume / 100);
+  ledcWrite(SPEAKER_PIN, (uint32_t)0x1FF * safeVolume(volume) / 100);
 }
 
 void startNote() {
@@ -176,7 +231,11 @@ void saveSong() {
   prefs.putString("name", songName);
 }
 
+bool settingsDirty = false;
+uint32_t settingsChangedAt = 0;
+
 void saveSettings() {
+  settingsDirty = false;
   prefs.putBool("loop", loopSong);
   prefs.putUShort("pause", pauseMs);
   prefs.putUChar("vol", volume);
@@ -184,13 +243,17 @@ void saveSettings() {
 
 void loadFromFlash() {
   loopSong = prefs.getBool("loop", true);
-  pauseMs = prefs.getUShort("pause", 1000);
-  volume = constrain(prefs.getUChar("vol", 50), 1, 100);
+  pauseMs = safePause(prefs.getUShort("pause", 1000));
+  volume = safeVolume(prefs.getUChar("vol", DEFAULT_VOLUME));
   size_t bytes = prefs.getBytesLength("song");
   if (bytes >= sizeof(Note) && bytes <= sizeof(song) && bytes % sizeof(Note) == 0) {
     prefs.getBytes("song", song, bytes);
     songLen = bytes / sizeof(Note);
-    songName = prefs.getString("name", "Моя мелодия");
+    for (size_t i = 0; i < songLen; i++) {
+      song[i].freq = safeFreq(song[i].freq);
+      song[i].ms = safeMs(song[i].ms);
+    }
+    songName = safeName(prefs.getString("name", "Моя мелодия"));
   } else {
     loadDefaultSong();
   }
@@ -201,8 +264,8 @@ void loadFromFlash() {
 
 void applySettingsFromArgs() {
   if (server.hasArg("loop")) loopSong = server.arg("loop") == "1";
-  if (server.hasArg("pause")) pauseMs = constrain(server.arg("pause").toInt(), 0, 60000);
-  if (server.hasArg("vol")) volume = constrain(server.arg("vol").toInt(), 1, 100);
+  if (server.hasArg("pause")) pauseMs = safePause(server.arg("pause").toInt());
+  if (server.hasArg("vol")) volume = safeVolume(server.arg("vol").toInt());
 }
 
 String jsonEscape(const String &s) {
@@ -229,6 +292,12 @@ void sendStatus() {
   j += ",\"pause\":" + String(pauseMs);
   j += ",\"vol\":" + String(volume);
   j += ",\"maxNotes\":" + String(MAX_NOTES);
+  j += ",\"maxVol\":" + String(MAX_VOLUME);
+  j += ",\"minFreq\":" + String(MIN_FREQ);
+  j += ",\"maxFreq\":" + String(MAX_FREQ);
+  j += ",\"minNoteMs\":" + String(MIN_NOTE_MS);
+  j += ",\"maxNoteMs\":" + String(MAX_NOTE_MS);
+  j += ",\"maxPause\":" + String(MAX_PAUSE_MS);
   j += "}";
   server.send(200, "application/json", j);
 }
@@ -236,6 +305,10 @@ void sendStatus() {
 // Body: "freq,ms;freq,ms;..."  Query: name, loop, pause, vol, save=1
 void handlePlay() {
   const String &body = server.arg("plain");
+  if (body.length() > MAX_BODY_LEN) {
+    server.send(413, "text/plain", "Слишком длинная мелодия");
+    return;
+  }
   size_t count = 0;
   int pos = 0;
   int len = body.length();
@@ -247,8 +320,8 @@ void handlePlay() {
       long f = body.substring(pos, comma).toInt();
       long d = body.substring(comma + 1, sep).toInt();
       if (d > 0) {
-        song[count].freq = (f >= 20 && f <= 20000) ? f : 0;
-        song[count].ms = constrain(d, 1, 65535);
+        song[count].freq = safeFreq(f);
+        song[count].ms = safeMs(d);
         count++;
       }
     }
@@ -260,7 +333,7 @@ void handlePlay() {
   }
   stopPlaying();
   songLen = count;
-  songName = server.hasArg("name") && server.arg("name").length() ? server.arg("name") : "Моя мелодия";
+  songName = server.hasArg("name") && server.arg("name").length() ? safeName(server.arg("name")) : "Моя мелодия";
   applySettingsFromArgs();
   if (server.arg("save") == "1") {
     saveSong();
@@ -272,7 +345,8 @@ void handlePlay() {
 
 void handleSettings() {
   applySettingsFromArgs();
-  saveSettings();
+  settingsDirty = true;
+  settingsChangedAt = millis();
   sendStatus();
 }
 
@@ -303,6 +377,7 @@ void setup() {
   Serial.begin(115200);
   ledcAttach(SPEAKER_PIN, 1000, 10);
   speakerOff();
+  gpio_set_drive_capability((gpio_num_t)SPEAKER_PIN, SPEAKER_DRIVE);
 
   prefs.begin("melody", false);
   loadFromFlash();
@@ -310,6 +385,7 @@ void setup() {
   WiFi.mode(WIFI_AP);
   WiFi.softAPConfig(AP_IP, AP_IP, IPAddress(255, 255, 255, 0));
   WiFi.softAP(AP_SSID, AP_PASS);
+  WiFi.setTxPower(WIFI_TX_POWER);
   dns.start(53, "*", AP_IP);
   setupServer();
   Serial.printf("Wi-Fi \"%s\" / \"%s\", open http://%s\n", AP_SSID, AP_PASS, AP_IP.toString().c_str());
@@ -321,4 +397,5 @@ void loop() {
   dns.processNextRequest();
   server.handleClient();
   playerTick();
+  if (settingsDirty && (millis() - settingsChangedAt) >= SETTINGS_SAVE_DELAY_MS) saveSettings();
 }
