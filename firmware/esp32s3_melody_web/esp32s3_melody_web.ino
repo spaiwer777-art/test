@@ -1,5 +1,6 @@
 // ESP32-S3 Super Mini: web-controlled melody player on a passive speaker.
-// Speaker: GPIO4 -> speaker -> GND.
+// Speaker: pin D4 (GPIO5) -> speaker -> GND. The pin can be changed on the
+// web page (boards labelled D0..D10 use the XIAO ESP32S3 pin layout).
 //
 // The board starts a Wi-Fi access point "ESP32-Melody" (password "melody123").
 // Connect to it and open http://192.168.4.1 (most phones open the page by
@@ -16,7 +17,21 @@
 #include <driver/gpio.h>
 #include "page.h"
 
-#define SPEAKER_PIN 4
+// Pins offered for the speaker: board label -> GPIO (XIAO ESP32S3 layout).
+// D6/D7 (GPIO43/44) are left out: they are the serial port.
+struct PinOption { const char *label; uint8_t gpio; };
+const PinOption SPEAKER_PINS[] = {
+  {"D0", 1}, {"D1", 2}, {"D2", 3}, {"D3", 4}, {"D4", 5}, {"D5", 6},
+  {"D8", 7}, {"D9", 8}, {"D10", 9},
+};
+const uint8_t DEFAULT_SPEAKER_GPIO = 5;  // D4
+uint8_t speakerPin = DEFAULT_SPEAKER_GPIO;
+
+bool isSpeakerPin(long gpio) {
+  for (const PinOption &p : SPEAKER_PINS)
+    if (p.gpio == gpio) return true;
+  return false;
+}
 
 const char *AP_SSID = "ESP32-Melody";
 const char *AP_PASS = "melody123";  // at least 8 characters
@@ -28,9 +43,10 @@ const IPAddress AP_IP(192, 168, 4, 1);
 
 // Pad drive strength of GPIO4: CAP_0 ~5 mA, CAP_1 ~10 mA, CAP_2 ~20 mA
 // (ESP32 default), CAP_3 ~40 mA (absolute maximum, never use it here).
-// CAP_1 keeps the pin well inside its rating; CAP_2 is louder and still in
-// spec. Do not go higher without a series resistor or a transistor.
-const gpio_drive_cap_t SPEAKER_DRIVE = GPIO_DRIVE_CAP_1;
+// CAP_2 is the chip's own default for every pin and is within spec; CAP_1 is
+// quieter with more margin. Do not use CAP_3 without a series resistor or a
+// transistor.
+const gpio_drive_cap_t SPEAKER_DRIVE = GPIO_DRIVE_CAP_2;
 
 // Volume 100 % = 50 % PWM duty (a square wave); never more, so the pin is
 // high at most half of the time.
@@ -137,7 +153,7 @@ uint32_t slotEnd = 0;   // when the next note starts
 
 static bool reached(uint32_t t) { return (int32_t)(millis() - t) >= 0; }
 
-void speakerOff() { ledcWrite(SPEAKER_PIN, 0); }
+void speakerOff() { ledcWrite(speakerPin, 0); }
 
 uint16_t safeFreq(long f) {
   if (f <= 0) return 0;
@@ -160,10 +176,20 @@ String safeName(const String &s) {
   return s.substring(0, n);
 }
 
+void attachSpeaker(uint8_t gpio) {
+  if (gpio == speakerPin) return;
+  ledcDetach(speakerPin);
+  pinMode(speakerPin, INPUT);  // release the old pin
+  speakerPin = gpio;
+  ledcAttach(speakerPin, 1000, 10);
+  ledcWrite(speakerPin, 0);
+  gpio_set_drive_capability((gpio_num_t)speakerPin, SPEAKER_DRIVE);
+}
+
 void speakerOn(uint16_t freq) {
-  ledcWriteTone(SPEAKER_PIN, safeFreq(freq));
+  ledcWriteTone(speakerPin, safeFreq(freq));
   // ledcWriteTone sets 50 % duty (0x1FF of 10 bits); scale it for volume.
-  ledcWrite(SPEAKER_PIN, (uint32_t)0x1FF * safeVolume(volume) / 100);
+  ledcWrite(speakerPin, (uint32_t)0x1FF * safeVolume(volume) / 100);
 }
 
 void startNote() {
@@ -239,6 +265,7 @@ void saveSettings() {
   prefs.putBool("loop", loopSong);
   prefs.putUShort("pause", pauseMs);
   prefs.putUChar("vol", volume);
+  prefs.putUChar("pin", speakerPin);
 }
 
 void loadFromFlash() {
@@ -266,6 +293,12 @@ void applySettingsFromArgs() {
   if (server.hasArg("loop")) loopSong = server.arg("loop") == "1";
   if (server.hasArg("pause")) pauseMs = safePause(server.arg("pause").toInt());
   if (server.hasArg("vol")) volume = safeVolume(server.arg("vol").toInt());
+  if (server.hasArg("pin") && isSpeakerPin(server.arg("pin").toInt())) {
+    bool wasPlaying = state != IDLE;
+    stopPlaying();
+    attachSpeaker(server.arg("pin").toInt());
+    if (wasPlaying) playFromStart();
+  }
 }
 
 String jsonEscape(const String &s) {
@@ -293,6 +326,13 @@ void sendStatus() {
   j += ",\"vol\":" + String(volume);
   j += ",\"maxNotes\":" + String(MAX_NOTES);
   j += ",\"maxVol\":" + String(MAX_VOLUME);
+  j += ",\"pin\":" + String(speakerPin);
+  j += ",\"pins\":[";
+  for (size_t i = 0; i < sizeof(SPEAKER_PINS) / sizeof(SPEAKER_PINS[0]); i++) {
+    if (i) j += ",";
+    j += "[\"" + String(SPEAKER_PINS[i].label) + "\"," + String(SPEAKER_PINS[i].gpio) + "]";
+  }
+  j += "]";
   j += ",\"minFreq\":" + String(MIN_FREQ);
   j += ",\"maxFreq\":" + String(MAX_FREQ);
   j += ",\"minNoteMs\":" + String(MIN_NOTE_MS);
@@ -375,12 +415,13 @@ void setupServer() {
 
 void setup() {
   Serial.begin(115200);
-  ledcAttach(SPEAKER_PIN, 1000, 10);
-  speakerOff();
-  gpio_set_drive_capability((gpio_num_t)SPEAKER_PIN, SPEAKER_DRIVE);
-
   prefs.begin("melody", false);
   loadFromFlash();
+  uint8_t pin = prefs.getUChar("pin", DEFAULT_SPEAKER_GPIO);
+  speakerPin = isSpeakerPin(pin) ? pin : DEFAULT_SPEAKER_GPIO;
+  ledcAttach(speakerPin, 1000, 10);
+  speakerOff();
+  gpio_set_drive_capability((gpio_num_t)speakerPin, SPEAKER_DRIVE);
 
   WiFi.mode(WIFI_AP);
   WiFi.softAPConfig(AP_IP, AP_IP, IPAddress(255, 255, 255, 0));

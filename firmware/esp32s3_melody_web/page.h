@@ -58,6 +58,9 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
     <span>Громкость</span><input type="range" id="vol" min="1" max="100" value="50"><span id="volVal">50%</span>
   </div>
   <div class="row">
+    <label>Пин динамика <select id="pin" style="width:auto"></select></label>
+  </div>
+  <div class="row">
     <label><input type="checkbox" id="loop" checked> Повторять</label>
     <label>пауза <input type="number" id="pause" min="0" max="10000" step="100" value="1000"> мс</label>
   </div>
@@ -91,7 +94,7 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
     <p><b>RTTTL</b> (рингтоны Nokia): <code>Имя:d=4,o=5,b=120:8e6,8d#6,…</code>. Тысячи готовых мелодий находятся поиском «rtttl collection».</p>
     <p><b>MIDI</b> (.mid): из нескольких голосов берётся самая верхняя нота (обычно это мелодия). Ударные пропускаются. Если звучит не то, выберите отдельную дорожку.</p>
     <p>Пьезо/динамик играет один голос, на плату влезает до <span id="maxN">1500</span> нот.</p>
-    <p><b>Защита платы:</b> ток пина ограничен в прошивке (~10 мА), громкость не выше 50 % ШИМ, ноты вне 100–8000 Гц переносятся по октаве, длина ноты 10 мс – 10 с, пауза до 10 с.</p>
+    <p><b>Защита платы:</b> ток пина ограничен в прошивке (~20 мА, штатный уровень ESP32), громкость не выше 50 % ШИМ, ноты вне 100–8000 Гц переносятся по октаве, длина ноты 10 мс – 10 с, пауза до 10 с.</p>
   </details>
 </section>
 </main>
@@ -354,6 +357,11 @@ function showStatus(st) {
   ["maxNotes", "maxVol", "minFreq", "maxFreq", "minNoteMs", "maxNoteMs", "maxPause"].forEach(k => { if (st[k] !== undefined) lim[k] = st[k]; });
   $("maxN").textContent = lim.maxNotes;
   $("vol").max = lim.maxVol; $("pause").max = lim.maxPause;
+  const pinSel = $("pin");
+  if (st.pins && !pinSel.options.length) {
+    st.pins.forEach(([label, gpio]) => { const o = document.createElement("option"); o.value = gpio; o.textContent = `${label} (GPIO${gpio})`; pinSel.appendChild(o); });
+  }
+  if (st.pin !== undefined && document.activeElement !== pinSel) pinSel.value = st.pin;
   $("stName").textContent = st.name || "—";
   $("stInfo").textContent = `${st.playing ? "играет" : "остановлено"} · ${st.notes} нот · ${fmtTime(st.durationMs)}`;
   $("stBar").style.width = (st.playing && st.notes ? Math.min(100, st.index / st.notes * 100) : 0) + "%";
@@ -406,6 +414,9 @@ $("file").addEventListener("change", async () => {
   } catch (e) { midiData = null; msg(e.message, "err"); }
 });
 $("track").addEventListener("change", () => msg(`Выбрано: ${midiNotes().length} нот.`, "ok"));
+$("pin").addEventListener("change", () => api("/api/settings?pin=" + $("pin").value)
+  .then(() => msg(`Динамик теперь на ${$("pin").selectedOptions[0].textContent}.`, "ok"))
+  .catch(e => msg("Ошибка: " + e.message, "err")));
 $("btnPreview").onclick = preview;
 $("btnSend").onclick = send;
 $("btnReplay").onclick = () => api("/api/replay").catch(e => msg(e.message, "err"));

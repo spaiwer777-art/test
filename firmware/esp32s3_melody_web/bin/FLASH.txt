@@ -1,4 +1,4 @@
-ESP32-S3 web melody player (GPIO4) — Arduino core esp32 3.3.12, FQBN esp32:esp32:esp32s3 (4MB, DIO, 80MHz)
+ESP32-S3 web melody player (speaker on D4 = GPIO5, changeable on the page) — Arduino core esp32 3.3.12, FQBN esp32:esp32:esp32s3 (4MB, DIO, 80MHz)
 
 Option A (simplest): merged_4MB.bin  -> 0x0
 
