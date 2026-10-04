@@ -1,0 +1,11 @@
+ESP32-S3 web melody player (GPIO4) — Arduino core esp32 3.3.12, FQBN esp32:esp32:esp32s3 (4MB, DIO, 80MHz)
+
+Option A (simplest): merged_4MB.bin  -> 0x0
+
+Option B (separate files):
+  bootloader.bin  -> 0x0
+  partitions.bin  -> 0x8000
+  boot_app0.bin   -> 0xE000
+  firmware.bin    -> 0x10000
+
+After flashing: Wi-Fi "ESP32-Melody", password "melody123", open http://192.168.4.1
