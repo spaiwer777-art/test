@@ -2,6 +2,7 @@ import React from "react";
 import { AbsoluteFill, Sequence, useCurrentFrame } from "remotion";
 import { C, E, Grain, prog } from "./kit";
 import { S1_DURATION, S1Intro } from "./scenes/S1Intro";
+import { Soundtrack } from "./Soundtrack";
 import { S2_DURATION, S2Wheel } from "./scenes/S2Wheel";
 import { S3_DURATION, S3Timeline, WHIP } from "./scenes/S3Timeline";
 import { S4_DURATION, S4Benz } from "./scenes/S4Benz";
@@ -74,7 +75,11 @@ export const CarStory: React.FC = () => {
       <Sequence name="Model T" from={T5} durationInFrames={S5_DURATION}>
         <S5ModelT />
       </Sequence>
-      <Sequence name="Stripe wipe" from={T_STRIPE} durationInFrames={STRIPE_DUR + 14}>
+      <Sequence
+        name="Stripe wipe"
+        from={T_STRIPE}
+        durationInFrames={STRIPE_DUR + 14}
+      >
         <StripeWipe />
       </Sequence>
       <Sequence name="Fleet" from={T6} durationInFrames={S6_DURATION}>
@@ -93,6 +98,7 @@ export const CarStory: React.FC = () => {
         <S10Outro />
       </Sequence>
       <Grain opacity={0.1} />
+      <Soundtrack />
     </AbsoluteFill>
   );
 };
