@@ -1,6 +1,5 @@
 import { Composition, Folder } from "remotion";
-import { CarHistory } from "./cars/CarHistory";
-import { CAR_HISTORY_DURATION } from "./cars/eras";
+import { CAR_STORY_DURATION, CarStory } from "./carstory/CarStory";
 import { PluginVideo, TRANSITION_FRAMES } from "./PluginVideo";
 import { CodeScene } from "./scenes/CodeScene";
 import { IntroScene } from "./scenes/IntroScene";
@@ -31,12 +30,12 @@ export const RemotionRoot: React.FC = () => {
         durationInFrames={110 + 150 + 150 + 150 + 120 - 4 * TRANSITION_FRAMES}
       />
       <Composition
-        id="CarHistory"
-        component={CarHistory}
+        id="CarStory"
+        component={CarStory}
         width={WIDTH}
         height={HEIGHT}
         fps={FPS}
-        durationInFrames={CAR_HISTORY_DURATION}
+        durationInFrames={CAR_STORY_DURATION}
       />
     </>
   );
