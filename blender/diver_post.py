@@ -74,17 +74,15 @@ def apply_drops(im, f):
     return Image.alpha_composite(im, spec.filter(ImageFilter.GaussianBlur(1.5)))
 
 
-# --- foam / bubbles smearing the glass as the head goes under
-foam_blobs = [(random.uniform(0, W), random.uniform(0, H), random.uniform(30, 160)) for _ in range(70)]
+WASH = (17, 23)   # a swell breaks over the mask while still at the surface
 
 
-def draw_foam(k):
-    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    for x, y, r in foam_blobs:
-        rr = r * (1 + k * 0.6)
-        d.ellipse((x - rr, y - rr - k * 400, x + rr, y + rr - k * 400), fill=(225, 245, 250, int(150 * (1 - k))))
-    return layer.filter(ImageFilter.GaussianBlur(18))
+def water_smear(im, k, tint=(170, 225, 230)):
+    """Water rushing over the glass: heavy blur that clears as k goes 0 → 1."""
+    blur = im.filter(ImageFilter.GaussianBlur(4 + 40 * (1 - k)))
+    veil = Image.new("RGBA", (W, H), tint + (int(120 * (1 - k)),))
+    out = Image.alpha_composite(blur, veil)
+    return Image.blend(out, im, k ** 1.5)
 
 
 files = sorted(f for f in os.listdir(src) if f.startswith("f") and f.endswith(".png"))
@@ -93,11 +91,21 @@ for name in files:
     im = Image.open(os.path.join(src, name)).convert("RGBA")
     if im.size != (W, H):
         im = im.resize((W, H), Image.LANCZOS)
+    if WASH[0] <= f <= WASH[1]:
+        # replace the frames where the swell covered the lens with a crossfade of the clean neighbours
+        a = Image.open(os.path.join(src, f"f{WASH[0] - 1:04d}.png")).convert("RGBA")
+        b = Image.open(os.path.join(src, f"f{WASH[1] + 1:04d}.png")).convert("RGBA")
+        u = (f - WASH[0] + 1) / (WASH[1] - WASH[0] + 2)
+        im = Image.blend(a, b, u)
+        peak = 1 - abs(u - 0.4) / 0.6
+        im = water_smear(im, max(0.0, 1 - peak))
+    elif WASH[1] < f <= WASH[1] + 8:
+        im = water_smear(im, 0.55 + 0.45 * (f - WASH[1]) / 8)
     if f < submerge:
         im = apply_drops(im, f)
-    k = (f - (submerge - 2)) / 14
+    k = (f - (submerge - 1)) / 16
     if 0 <= k < 1:
-        im = Image.alpha_composite(im, draw_foam(k))
+        im = water_smear(im, k, tint=(200, 240, 245))
     im = Image.alpha_composite(im, rim_layer)
     im = Image.alpha_composite(im, frame_layer)
     im.convert("RGB").save(os.path.join(dst, name), compress_level=1)
