@@ -11,11 +11,11 @@ from common import plinth, plinth_groove, PLINTH_H
 PT = PLINTH_H          # plinth top
 
 
-def _fig(key, title, sub, solid, w, d, hi_z, color, back=None, extra=None):
+def _fig(key, title, sub, solid, w, d, hi_z, color, back=None, extra=None, decals=None):
     m = 4.0
     bx = max(w / 2, extra or 0) + m
     return dict(key=key, title=title, sub=sub, solid=solid,
-                plinth=(w, d), color=color, back=back or [],
+                plinth=(w, d), color=color, back=back or [], decals=decals or [],
                 bounds=((-bx, -d / 2 - m - (extra or 0), -1.0),
                         (bx, d / 2 + m + (extra or 0), hi_z + m)))
 
@@ -352,20 +352,28 @@ def spyware():
 
 
 # =========================================================================== 6
-def pillow_heart(size, z_tip, R, ky):
-    """Puffy heart: iq's exact 2D heart, inset by R and swept with an
-    ellipse (R in X/Z, R*ky in Y)."""
-    s, R, ky, zt = F(size), F(R), F(ky), F(z_tip)
+def _heart_unit(x, z):
+    """iq's exact 2D heart: tip at the origin, about 1.2 wide and 1.1 tall."""
     c = F(math.sqrt(2) / 4)
+    x = np.abs(x)
+    a = np.sqrt((x - 0.25) ** 2 + (z - 0.75) ** 2) - c
+    b1 = x ** 2 + (z - 1.0) ** 2
+    m = 0.5 * np.maximum(x + z, 0)
+    b2 = (x - m) ** 2 + (z - m) ** 2
+    b = np.sqrt(np.minimum(b1, b2)) * np.sign(x - z)
+    return np.where(x + z > 1.0, a, b)
 
-    def d2(x, z):
-        x = np.abs(x)
-        a = np.sqrt((x - 0.25) ** 2 + (z - 0.75) ** 2) - c
-        b1 = x ** 2 + (z - 1.0) ** 2
-        m = 0.5 * np.maximum(x + z, 0)
-        b2 = (x - m) ** 2 + (z - m) ** 2
-        b = np.sqrt(np.minimum(b1, b2)) * np.sign(x - z)
-        return np.where(x + z > 1.0, a, b)
+
+def heart2(size, tip=(0, 0)):
+    s, tu, tv = F(size), F(tip[0]), F(tip[1])
+    return lambda u, v: _heart_unit((u - tu) / s, (v - tv) / s) * s
+
+
+def pillow_heart(size, z_tip, R, ky):
+    """Puffy heart: exact 2D heart, inset by R and swept with an ellipse
+    (R in X/Z, R*ky in Y)."""
+    s, R, ky, zt = F(size), F(R), F(ky), F(z_tip)
+    d2 = _heart_unit
 
     def g(p):
         q = d2(p[:, 0] / s, (p[:, 2] - zt) / s) * s + R
@@ -632,5 +640,62 @@ def zeroday():
                 back=[('DAYS SINCE DISCLOSURE: 0', 3.0)])
 
 
-ALL = [trojan, wannacry, morris_worm, phage, spyware, heartbleed, phishing, log4shell, spectre, zeroday]
+# =========================================================================== 11
+def iloveyou():
+    W, D = 76, 58
+    top = PT + 71
+    fy = -17.0
+    env = box((66, 34, 72), c=(0, 0, PT + 35), r=5)
+    # closed flap (raised) and the two lower folds
+    flap = polygon2([(-30.5, top - 3.5), (30.5, top - 3.5), (0, PT + 35)])
+    env = emboss(env, lambda u, v: flap(u, v) + 0.0, 1.2, front='-y', k=0.4)
+    folds = u2(seg2((-30.5, PT + 3), (-7, PT + 30), 0.5), seg2((30.5, PT + 3), (7, PT + 30), 0.5))
+    env = engrave(env, folds, 0.7, front='-y')
+    # wax seal with a heart where the flap meets the folds
+
+    def seal(u, v):
+        x, z = u, v - (PT + 35)
+        r = np.sqrt(x * x + z * z)
+        th = np.arctan2(z, x)
+        return r - (8.6 + 0.6 * np.sin(9 * th))
+    env = emboss(env, seal, 2.6, front='-y', k=0.6)
+    env = engrave(env, heart2(9.0, (0, PT + 30.4)), 1.0, front='-y')
+    # the worm crawling out of the letter
+    path = [(17, 0, top - 5), (21, -3, top + 4), (20, -7, top + 11), (15, -11, top + 16)]
+    segs = []
+    for i in range(len(path) - 1):
+        a, b = np.array(path[i], float), np.array(path[i + 1], float)
+        for t in np.linspace(0, 1, 3, endpoint=False):
+            segs.append(sphere(5.8 - 0.12 * len(segs), a + (b - a) * t))
+    body = union(*segs, k=1.4)
+    hc = np.array((10.0, -14.0, top + 21.0))
+    head = sphere(8.5, hc)
+    worm = union(body, head, k=3.0)
+    eyes = union(*[sphere(2.5, hc + (s * 3.3, -7.2, 2.4)) for s in (-1, 1)])
+    worm = union(worm, eyes, k=0.6)
+    worm = difference(worm, *[sphere(1.2, hc + (s * 3.3, -9.6, 2.6)) for s in (-1, 1)], k=0.2)
+    worm = engrave(worm, arc2(3.2, 0.6, 210, 330, c=(hc[0], hc[2] - 1.4)), 0.8, front='-y')
+    ants = []
+    for s in (-1, 1):
+        tip = hc + (s * 6.5, 0.5, 15.5)
+        ants.append(tube([hc + (s * 2.6, 0.5, 6.6), hc + (s * 4.8, 0.5, 11.5), tip], [1.15, 1.0, 0.9]))
+        ants.append(pillow_heart(6.0, tip[2] - 0.8, 1.2, 1.1).move(tip[0], tip[1], 0))
+    worm = union(worm, *ants, k=0.6)
+    worm = bounded(worm, hc + (0, 5, -5), 32)
+    # postage stamp on the back
+    perf = u2(*[c2(0.9, (12 + x, PT + 54 + z)) for x in np.arange(-9, 9.1, 3.0) for z in (-12, 12)],
+              *[c2(0.9, (12 + x, PT + 54 + z)) for x in (-10, 10) for z in np.arange(-9, 9.1, 3.0)])
+    stamp = sub2(rect2(20, 24, c=(12, PT + 54)), perf)
+    env = emboss(env, stamp, 1.0, front='+y', k=0.3)
+    env = engrave(env, u2(heart2(10.0, (12, PT + 48.5)),
+                          lambda u, v: np.abs(rect2(16.5, 20.5, c=(12, PT + 54))(u, v)) - 0.35), 0.7, front='+y')
+    letter = union(env, worm, k=2.0)
+    solid = union(base_plinth(W, D), letter, k=2.0)
+    return _fig('11_iloveyou', 'ILOVEYOU', 'LOVE BUG  ·  2000', solid, W, D, top + 34,
+                (0.95, 0.42, 0.58),
+                back=[('LOVE-LETTER-FOR-YOU.TXT.VBS', 3.0)],
+                decals=[dict(text='I \u2665 YOU', cap=7.5, x=0.0, z=PT + 12.5, y=fy, width=36.0, depth=0.9)])
+
+
+ALL = [trojan, wannacry, morris_worm, phage, spyware, heartbleed, phishing, log4shell, spectre, zeroday, iloveyou]
 BY_KEY = {f.__name__: f for f in ALL}

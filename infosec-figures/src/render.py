@@ -141,15 +141,16 @@ def hero(key, samples):
 def group(keys, samples):
     reset(samples)
     studio(size=2.2)
-    cols = 5
+    cols = (len(keys) + 1) // 2
     for i, key in enumerate(keys):
         meta = json.load(open(os.path.join(BUILD, key + '.json')))
         r, c = divmod(i, cols)
-        x = (c - (cols - 1) / 2) * 96 + (48 if r else 0) - 24
+        n = cols if r == 0 else len(keys) - cols
+        x = (c - (n - 1) / 2) * 96 + (0 if n != cols else (-24 if r == 0 else 24))
         y = r * 260
         ob = load(key, (x, y, 0))
         ob.data.materials.append(material(key, meta['color']))
-    camera((0, 125, 50), 1250, elev_deg=33, az_deg=0, lens=76)
+    camera((0, 125, 50), 1250, elev_deg=33, az_deg=0, lens=68)
     render(os.path.join(OUT, '00_collection.jpg'), res=(2400, 1600))
 
 
@@ -159,7 +160,7 @@ def cutaway(key, samples):
     meta = json.load(open(os.path.join(BUILD, key + '.json')))
     ob = load(key)
     ob.data.materials.append(material(key, meta['color']))
-    bpy.ops.wm.stl_import(filepath=os.path.join(STL, 'cap_x10.stl'))
+    bpy.ops.wm.stl_import(filepath=os.path.join(STL, 'cap_universal.stl'))
     cap = bpy.context.selected_objects[0]
     cap.location.z = C.FLANGE_Z0
     cap.data.materials.append(material('cap', (0.9, 0.75, 0.1), plinth_split=False))

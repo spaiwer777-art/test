@@ -54,7 +54,7 @@ def main():
         v, f, nblk = mesh_sdf(solid, (lo, hi), h=args.h)
         path = os.path.join(BUILD, fig['key'] + '.ply')
         write_ply(path, v, f)
-        meta = {k: fig[k] for k in ('key', 'title', 'sub', 'plinth', 'color', 'back')}
+        meta = {k: fig[k] for k in ('key', 'title', 'sub', 'plinth', 'color', 'back', 'decals')}
         meta['bounds'] = [lo.tolist(), hi.tolist()]
         meta['wall_ok'] = not len(bad)
         with open(os.path.join(BUILD, fig['key'] + '.json'), 'w') as fh:

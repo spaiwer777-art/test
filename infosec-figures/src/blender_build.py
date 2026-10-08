@@ -299,6 +299,18 @@ def clean_mesh(ob):
     return len(comps) - 1
 
 
+def place_decal(dc, font):
+    """Engraving on a flat face of the figure itself, facing -Y."""
+    depth = dc.get('depth', 0.9)
+    ob, h = text_mesh(dc['text'], dc['cap'], dc['width'], font, depth + 1.5)
+    ob.rotation_euler = (math.radians(90), 0, 0)
+    off = (depth + 1.5) / 2 - depth
+    ob.location = (dc['x'], dc['y'] - off, dc['z'] - h / 2)
+    select_only(ob)
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    return ob
+
+
 def manifold_report(ob):
     bm = bmesh.new()
     bm.from_mesh(ob.data)
@@ -337,6 +349,8 @@ def build_figure(key):
     if meta.get('back'):
         back = place_text([tuple(b) for b in meta['back']], d / 2, True, font, w)
         boolean(ob, back, 'DIFFERENCE', self_intersect=True)
+    for dc in meta.get('decals', []):
+        boolean(ob, place_decal(dc, font), 'DIFFERENCE', self_intersect=True)
     boolean(ob, female_cutter(), 'DIFFERENCE')
     dropped = clean_mesh(ob)
     nm, loose = manifold_report(ob)
@@ -354,7 +368,7 @@ def build_cap_files():
     bpy.ops.object.transform_apply(location=True)
     clean_mesh(cap)
     nm, _ = manifold_report(cap)
-    export_stl(cap, os.path.join(STL, 'cap_x10.stl'))
+    export_stl(cap, os.path.join(STL, 'cap_universal.stl'))
     print(f'[cap] {len(cap.data.polygons)} tris, non-manifold edges: {nm}')
 
     # thread test ring: the bottom 18 mm of a plinth with the same cut-outs
