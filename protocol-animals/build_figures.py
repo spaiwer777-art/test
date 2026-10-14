@@ -514,9 +514,9 @@ def icmp_bat():
              name="ear_ridge")
         # закрытые глаза-дуги ∪ — мышь ориентируется по эху
         arc(hc + Vector((sx * 3.6, -7.6, 1.6)), 1.8, 200, 340, 0.6, name="closed_eye")
-        # клыки
-        cone(hc + Vector((sx * 1.5, -6.9, -3.6)), hc + Vector((sx * 1.3, -7.4, -5.9)), 0.9, 0.5,
-             name="fang")
+        # клыки: сплющенные, торчат вниз из-под мордочки
+        cone(hc + Vector((sx * 2.0, -8.2, -2.9)), hc + Vector((sx * 2.15, -8.7, -5.3)), 1.15, 0.4,
+             flat=0.65, name="fang")
         # ножки
         ellipsoid((sx * 4.4, -1.5, B + 1.4), (2.8, 4.0, 2.0), name="foot")
 
@@ -534,7 +534,6 @@ def icmp_bat():
 
     ellipsoid(hc + Vector((0, -7.0, -1.2)), (3.6, 2.6, 2.6), name="muzzle")
     sphere(hc + Vector((0, -9.3, -0.5)), 1.2, name="nose")
-    arc(hc + Vector((0, -8.6, -3.0)), 1.9, 200, 340, 0.55, name="mouth")
 
     # волны ping: стоячие дуги, к краю подставки затухают
     for r, h, span in ((12.5, 3.4, 22), (15.5, 2.5, 25), (18.5, 1.6, 28)):
