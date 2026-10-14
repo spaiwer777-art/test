@@ -795,6 +795,7 @@ def main():
         render(os.path.join(RENDER_DIR, "lineup.png"), (1800, 760))
 
     if not only:
+        bpy.context.preferences.filepaths.save_version = 0  # без резервной копии .blend1
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "protocol_animals.blend"),
                                     compress=True)
 
