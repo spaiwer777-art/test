@@ -1,0 +1,1144 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Желейная песочница</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Onest:wght@400;500;600&display=swap">
+<style>
+  /* Layout: full-bleed 3D tray; title floats top-left, a glass shelf of jellies docks at the bottom. Single light candy-shop look, by choice. */
+  :root {
+    --sky-top: #f5f8ff;
+    --sky-low: #c7d5f6;
+    --ink: #1e2452;
+    --ink-soft: #545d8f;
+    --glass: rgba(255, 255, 255, 0.78);
+    --line: rgba(30, 36, 82, 0.12);
+    --chip: #ffffff;
+    --accent: #ff3d6e;
+    --accent-ink: #ffffff;
+    --display: "Unbounded", "Arial Black", system-ui, sans-serif;
+    --ui: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: light;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: radial-gradient(120% 90% at 50% 10%, var(--sky-top) 0%, var(--sky-low) 100%);
+    color: var(--ink);
+    font-family: var(--ui);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    -webkit-tap-highlight-color: transparent;
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  #scene.on-jelly { cursor: pointer; }
+  #scene.dragging { cursor: grabbing; }
+
+  .hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 18px);
+    padding-left: max(18px, env(safe-area-inset-left, 0px));
+    padding-right: max(18px, env(safe-area-inset-right, 0px));
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+    pointer-events: none;
+  }
+  .title { display: grid; gap: 8px; min-width: 0; }
+  h1 {
+    margin: 0; font-family: var(--display); font-weight: 800;
+    font-size: clamp(20px, 3.4vw, 34px); line-height: 0.98; letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  h1 span { color: var(--accent); }
+  .hint { margin: 0; max-width: 34ch; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+  .count {
+    font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 7px 12px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+
+  .dock {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px;
+    pointer-events: none;
+  }
+  .shelf {
+    pointer-events: auto; min-width: 0; max-width: 100%;
+    display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+    padding: 6px; border-radius: 999px;
+    background: var(--glass); border: 1px solid var(--line);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 10px 30px rgba(30, 36, 82, 0.14);
+  }
+  .shelf::-webkit-scrollbar { display: none; }
+  .actions { pointer-events: auto; display: flex; gap: 8px; }
+  button {
+    font: 600 13px/1 var(--ui); color: var(--ink); cursor: pointer;
+    border: 0; border-radius: 999px; touch-action: manipulation;
+  }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .chip {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    padding: 6px 13px 6px 6px; background: var(--chip);
+    transition: transform 0.18s cubic-bezier(.3, 1.6, .5, 1);
+  }
+  .chip:hover { transform: translateY(-2px); }
+  .chip:active { transform: scale(0.92, 0.86); }
+  .dot {
+    width: 26px; height: 26px; border-radius: 50%; flex: none;
+    background:
+      radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.85) 0 12%, rgba(255, 255, 255, 0) 34%),
+      var(--c);
+    box-shadow: inset 0 -4px 7px rgba(0, 0, 0, 0.2), var(--ring, 0 0 0 0 transparent);
+  }
+  .act { padding: 11px 16px; background: var(--chip); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(30, 36, 82, 0.12); }
+  .act.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .act:active { transform: scale(0.95); }
+
+  .loading {
+    position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none;
+    font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: 0.02em; color: var(--ink-soft);
+  }
+
+  @media (max-width: 560px) {
+    .hint { font-size: 12px; max-width: 26ch; }
+    .shelf { border-radius: 22px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chip, .chip:hover, .chip:active { transition: none; transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="scene" aria-label="Стол с желейными фигурками"></canvas>
+
+<header class="hud">
+  <div class="title">
+    <h1>Желейная<br><span>песочница</span></h1>
+    <p class="hint">Тащи желе — оно повиснет на пальце. Отпусти, и оно шлёпнется. Тапни, чтобы ткнуть. Тяни по фону, чтобы повернуть стол, колесо или щипок для зума.</p>
+  </div>
+  <div class="count" id="count">0 / 24</div>
+</header>
+
+<nav class="dock" aria-label="Добавить желе">
+  <div class="shelf" id="shelf"></div>
+  <div class="actions">
+    <button class="act primary" id="shake" type="button">Встряхнуть</button>
+    <button class="act" id="clear" type="button">Убрать всё</button>
+  </div>
+</nav>
+
+<div class="loading" id="loading">Варим желе…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+"use strict";
+const T3 = window.THREE;
+
+/* ---------------- small math ---------------- */
+const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+const mix = (a, b, t) => a + (b - a) * t;
+const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+const len2 = (x, y) => Math.sqrt(x * x + y * y);
+const len3 = (x, y, z) => Math.sqrt(x * x + y * y + z * z);
+const fract = (x) => x - Math.floor(x);
+function smin(a, b, k) { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; }
+function sdEll(x, y, z, rx, ry, rz) {
+  const k0 = len3(x / rx, y / ry, z / rz), k1 = len3(x / (rx * rx), y / (ry * ry), z / (rz * rz));
+  return k1 < 1e-9 ? -Math.min(rx, ry, rz) : k0 * (k0 - 1) / k1;
+}
+function sdCaps(x, y, z, ax, ay, az, bx, by, bz, ra, rb) {
+  const pax = x - ax, pay = y - ay, paz = z - az, bax = bx - ax, bay = by - ay, baz = bz - az;
+  const h = clamp((pax * bax + pay * bay + paz * baz) / (bax * bax + bay * bay + baz * baz), 0, 1);
+  return len3(pax - bax * h, pay - bay * h, paz - baz * h) - mix(ra, rb, h);
+}
+// circular sector around +y with half-angle a and radius R, apex at origin
+function sdPie(x, y, a, R) {
+  const s = Math.sin(a), c = Math.cos(a);
+  x = Math.abs(x);
+  const l = len2(x, y) - R;
+  const t = clamp(x * s + y * c, 0, R);
+  const m = len2(x - s * t, y - c * t);
+  return Math.max(l, m * Math.sign(c * x - s * y));
+}
+function extrude(d, z, h) {
+  const wx = d, wy = Math.abs(z) - h;
+  return Math.min(Math.max(wx, wy), 0) + len2(Math.max(wx, 0), Math.max(wy, 0));
+}
+const col = (h) => { const c = new T3.Color(h); return [c.r, c.g, c.b]; };
+const mixc = (a, b, t) => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
+const lc = (h) => new T3.Color(h).convertSRGBToLinear();
+const angDist = (a, b) => Math.abs(((a - b) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI);
+
+/* ---------------- shared decal geometry ---------------- */
+const GEO = {
+  sphere: new T3.SphereGeometry(1, 14, 10),
+  cyl: new T3.CylinderGeometry(1, 1, 1, 12),
+};
+
+/* ---------------- jelly shapes: signed distance + colour ---------------- */
+const WM = { R: 1.7, a: 0.62, h: 0.22, rnd: 0.13 };
+WM.cy = 2 * WM.R * Math.sin(WM.a) / (3 * WM.a);
+const OR = { R: 1.08, a: Math.PI / 2, h: 0.2, rnd: 0.13 };
+OR.cy = 4 * OR.R / (3 * Math.PI);
+
+const P = {
+  rindD: col("#1d7432"), rindL: col("#41b04c"), pale: col("#dcf6b9"), fleshE: col("#ff8792"), flesh: col("#f22c48"),
+  kern: col("#ffd43a"), kernE: col("#ef9f17"), leaf: col("#4fae35"), leaf2: col("#8fd35a"), nub: col("#b9c86a"),
+  straw: col("#ea1739"), strawTop: col("#ff5b6c"), calyx: col("#2f9233"), calyx2: col("#69c64c"),
+  ban: col("#ffd83a"), ban2: col("#fff07e"), banG: col("#c3d744"), banStem: col("#7d9a3a"), banTip: col("#4a3020"),
+  peel: col("#ff7410"), pith: col("#fff2d2"), memb: col("#ffe2a6"), pulp: col("#ff9c1a"), pulp2: col("#ffbd4f"),
+  cherry: col("#d8132f"), cherryD: col("#93081f"),
+};
+
+function cornParts(x, y, z) {
+  const ph = Math.atan2(z, y);
+  const w = 1.15 * Math.pow(clamp((0.3 - x) / 1.5, 0, 1), 0.75);
+  let leaf = false;
+  for (const a of [0.35, 2.45, 4.4]) if (angDist(ph, a) < w) { leaf = true; break; }
+  const v = (ph / (2 * Math.PI) + 0.5) * 20;
+  const row = Math.floor(v);
+  const u = x * 7 + (row % 2) * 0.5;
+  const fu = fract(u) - 0.5, fv = v - row - 0.5;
+  const g = Math.max(0, 1 - (fu * fu + fv * fv) * 4.4);
+  return { leaf, g, ph };
+}
+function strawLeaf(x, y, z) {
+  const th = Math.atan2(z, x);
+  const lobe = Math.pow(0.5 + 0.5 * Math.cos(5 * th), 3);
+  return y > 0.6 - 0.34 * lobe;
+}
+function strawBody(x, y, z) {
+  return smin(sdEll(x, y - 0.12, z, 0.7, 0.62, 0.7), len3(x, y + 0.56, z) - 0.2, 0.75);
+}
+function banana(x, y, z) {
+  const qy = y - (0.26 * x * x - 0.25);
+  const ax = Math.abs(x);
+  const ps = Math.atan2(z, qy);
+  const r = 0.36 * Math.pow(Math.max(0, 1 - Math.pow(ax / 1.62, 2.5)), 0.5) * (1 + 0.04 * Math.cos(5 * ps));
+  const body = Math.max(len2(qy, z) - r, ax - 1.62);
+  const stem = Math.max(len2(qy, z) - 0.1, Math.abs(x - 1.68) - 0.28);
+  const nub = len3(x + 1.6, qy, z) - 0.08;
+  return Math.min(body, stem, nub);
+}
+
+const BEAR_COLORS = ["#ff2d48", "#ff8a17", "#ffd21f", "#3fcf5a", "#f4efe2", "#ff5fa8"];
+
+const SHAPES = {
+  watermelon: {
+    name: "Арбуз", dot: "#ff4d5e", ring: "inset 0 0 0 4px #2f9a3e",
+    detail: 5, S: [1, 1, 0.34], tMax: 1.7,
+    sdf: (x, y, z) => extrude(sdPie(x, y + WM.cy, WM.a, WM.R), z, WM.h) - WM.rnd,
+    color(x, y, z) {
+      const qy = y + WM.cy, rr = len2(x, qy), R = WM.R;
+      if (rr > R - 0.08) {
+        const ph = Math.atan2(x, qy);
+        const st = 0.5 + 0.5 * Math.sin(ph * 30 + 2 * Math.sin(ph * 70) + z * 3);
+        return mixc(P.rindD, P.rindL, smooth(0.3, 0.7, st));
+      }
+      if (rr > R - 0.2) return mixc(P.pale, P.rindL, smooth(R - 0.12, R - 0.08, rr));
+      return mixc(P.flesh, P.fleshE, smooth(R - 0.75, R - 0.2, rr));
+    },
+    decals() {
+      const items = [];
+      for (const side of [-1, 1]) {
+        for (const [rr, phs] of [[0.72, [-0.28, 0, 0.28]], [1.12, [-0.42, -0.14, 0.14, 0.42]]]) {
+          for (const ph of phs) {
+            items.push({ p: [rr * Math.sin(ph), rr * Math.cos(ph) - WM.cy, side * (WM.h + WM.rnd - 0.012)], r: [0, 0, -ph], s: [0.06, 0.105, 0.03] });
+          }
+        }
+      }
+      return [{ geo: GEO.sphere, color: "#2a1814", items }];
+    },
+  },
+  corn: {
+    name: "Кукуруза", dot: "#ffcf2e", ring: "inset 0 0 0 4px #5cb83a",
+    detail: 5, S: [2.4, 1, 1], tMax: 1.95,
+    sdf(x, y, z) {
+      let d = sdCaps(x, y, z, -0.78, 0, 0, 0.85, 0, 0, 0.52, 0.41);
+      const c = cornParts(x, y, z);
+      if (c.leaf && x < 0.3) d -= 0.07;
+      else d -= 0.05 * Math.sqrt(c.g) * smooth(-1.3, -1.0, x);
+      return Math.min(d, sdCaps(x, y, z, -1.2, 0, 0, -1.55, 0, 0, 0.2, 0.15));
+    },
+    color(x, y, z) {
+      if (x < -1.27) return P.nub;
+      const c = cornParts(x, y, z);
+      if (c.leaf && x < 0.3) {
+        const vein = 0.5 + 0.5 * Math.sin(c.ph * 60);
+        return mixc(P.leaf, P.leaf2, vein * 0.5 + smooth(-0.2, 0.3, x) * 0.4);
+      }
+      return mixc(P.kernE, P.kern, smooth(0.05, 0.6, c.g));
+    },
+  },
+  strawberry: {
+    name: "Клубника", dot: "#f2233f", ring: "inset 0 5px 0 0 #2f9233",
+    detail: 4, S: [1, 1.1, 1], tMax: 1.3,
+    sdf(x, y, z) {
+      const d = strawBody(x, y, z);
+      return strawLeaf(x, y, z) ? d - 0.05 : d;
+    },
+    color(x, y, z) {
+      if (strawLeaf(x, y, z)) return mixc(P.calyx, P.calyx2, smooth(0.95, 0.5, y));
+      return mixc(P.straw, P.strawTop, smooth(-0.3, 0.6, y) * 0.75);
+    },
+    decals(surf) {
+      const seeds = [];
+      const n = 110, ga = Math.PI * (3 - Math.sqrt(5));
+      for (let i = 0; i < n; i++) {
+        const y = 1 - (i + 0.5) / n * 2, r = Math.sqrt(1 - y * y), th = ga * i;
+        const dx = Math.cos(th) * r, dz = Math.sin(th) * r;
+        const t = surf(dx, y, dz);
+        const px = dx * (t - 0.008), py = y * (t - 0.008), pz = dz * (t - 0.008);
+        if (strawLeaf(px, py + 0.04, pz) || py > 0.5) continue;
+        seeds.push({ p: [px, py, pz], r: [th, 0, 0], s: [0.032, 0.032, 0.032] });
+      }
+      const top = surf(0, 1, 0);
+      return [
+        { geo: GEO.sphere, color: "#ffe07a", items: seeds },
+        { geo: GEO.cyl, color: "#3f8a2a", items: [{ p: [0.02, top + 0.1, 0], r: [0, 0, -0.18], s: [0.05, 0.3, 0.05] }] },
+      ];
+    },
+  },
+  banana: {
+    name: "Банан", dot: "#ffe14a", ring: "inset -6px 0 0 0 #7d9a3a",
+    detail: 5, S: [2.3, 1, 1], tMax: 2.3,
+    sdf: banana,
+    color(x, y, z) {
+      if (x < -1.5) return P.banTip;
+      if (x > 1.4) return mixc(P.banStem, P.banTip, smooth(1.85, 1.95, x));
+      const qy = y - (0.26 * x * x - 0.25);
+      const ridge = Math.pow(0.5 + 0.5 * Math.cos(5 * Math.atan2(z, qy)), 6);
+      const base = mixc(P.ban, P.ban2, ridge * 0.5);
+      return mixc(base, P.banG, smooth(0.9, 1.4, x));
+    },
+  },
+  orange: {
+    name: "Апельсин", dot: "#ff9a1f", ring: "inset 0 0 0 3px #fff2d2",
+    detail: 5, S: [1, 0.65, 0.4], tMax: 1.4,
+    sdf: (x, y, z) => extrude(sdPie(x, y + OR.cy, OR.a, OR.R), z, OR.h) - OR.rnd,
+    color(x, y, z) {
+      const qy = y + OR.cy, rr = len2(x, qy), R = OR.R;
+      if (rr > R - 0.02) return P.peel;
+      if (rr > R - 0.11) return P.pith;
+      const ph = Math.atan2(x, qy);
+      const f = fract((ph + Math.PI / 2) / (Math.PI / 7));
+      if (Math.min(f, 1 - f) < 0.06 || rr < 0.13) return P.memb;
+      const ves = 0.5 + 0.5 * Math.sin(rr * 46 + Math.sin(ph * 40) * 2);
+      return mixc(P.pulp, P.pulp2, ves * 0.6);
+    },
+  },
+  bear: {
+    name: "Мишка", dot: "conic-gradient(#ff2d48 0 25%, #ffd21f 0 50%, #3fcf5a 0 75%, #ff8a17 0)",
+    detail: 5, S: [0.8, 1.35, 0.55], tMax: 1.45,
+    variants: BEAR_COLORS,
+    sdf(x, y, z) {
+      let d = sdEll(x, y + 0.18, z, 0.52, 0.6, 0.38);
+      d = smin(d, sdEll(x, y - 0.6, z, 0.46, 0.4, 0.36), 0.18);
+      d = smin(d, sdEll(x, y - 0.5, z - 0.26, 0.2, 0.15, 0.14), 0.1);
+      for (const s of [-1, 1]) {
+        d = smin(d, len3(x - s * 0.33, y - 0.95, z) - 0.15, 0.08);
+        d = smin(d, sdEll(x - s * 0.5, y - 0.05, z - 0.05, 0.17, 0.26, 0.16), 0.12);
+        d = smin(d, sdEll(x - s * 0.28, y + 0.68, z - 0.06, 0.21, 0.22, 0.2), 0.12);
+      }
+      return d;
+    },
+    color(x, y, z, v) {
+      const c = col(v);
+      const belly = Math.exp(-((x * x) / 0.08 + ((y + 0.15) * (y + 0.15)) / 0.15)) * smooth(0.1, 0.35, z);
+      return mixc(c, [1, 1, 1], belly * 0.18);
+    },
+  },
+  apple: {
+    name: "Яблоко", dot: "#8fd14f", ring: "inset 0 0 0 4px #e3263a",
+    detail: 4, S: [1, 1, 1], tMax: 1.2,
+    variants: ["red", "green"],
+    sdf(x, y, z) {
+      const rho = len2(x, z);
+      let d = len3(x, y * 1.08, z) - 0.76;
+      d += 0.2 * Math.exp(-rho * rho / 0.03) * smooth(0.0, 0.4, y);
+      d += 0.08 * Math.exp(-rho * rho / 0.02) * smooth(0.0, -0.4, y);
+      return d;
+    },
+    color(x, y, z, v) {
+      const base = col(v === "red" ? "#e3263a" : "#8ccf3e");
+      const streak = col(v === "red" ? "#ffa040" : "#ece35a");
+      const t = (0.5 + 0.5 * Math.sin(Math.atan2(z, x) * 9 + y * 3)) * smooth(0.3, -0.7, y) * 0.55;
+      return mixc(base, streak, t);
+    },
+    decals(surf) {
+      const top = surf(0, 1, 0);
+      return [
+        { geo: GEO.cyl, color: "#6b4a2a", items: [{ p: [0.02, top + 0.14, 0], r: [0, 0, -0.18], s: [0.035, 0.36, 0.035] }] },
+        { geo: GEO.sphere, color: "#4fae3a", items: [{ p: [0.18, top + 0.2, 0.02], r: [0.2, 0.4, -0.45], s: [0.22, 0.025, 0.1] }] },
+      ];
+    },
+  },
+  cherry: {
+    name: "Вишня", dot: "#d4142f", ring: "inset 0 0 0 4px #93081f",
+    detail: 4, S: [1, 1, 1], tMax: 0.9,
+    sdf(x, y, z) {
+      const rho = len2(x, z);
+      return len3(x, y * 1.05, z) - 0.52 + 0.1 * Math.exp(-rho * rho / 0.02) * smooth(0, 0.3, y);
+    },
+    color(x, y, z) {
+      const seam = Math.exp(-x * x / 0.002) * smooth(0, 0.3, z) * 0.6;
+      return mixc(mixc(P.cherryD, P.cherry, smooth(-0.5, 0.25, y)), P.cherryD, seam);
+    },
+    decals(surf) {
+      const top = surf(0, 1, 0);
+      const curve = new T3.CatmullRomCurve3([
+        new T3.Vector3(0, 0, 0), new T3.Vector3(0.03, 0.3, 0), new T3.Vector3(0.15, 0.66, 0.03), new T3.Vector3(0.36, 0.98, 0.06),
+      ]);
+      return [{ geo: new T3.TubeGeometry(curve, 28, 0.032, 8, false), color: "#5d8f2e", items: [{ p: [0, top - 0.05, 0], r: [0, 0, 0], s: [1, 1, 1] }] }];
+    },
+  },
+};
+const KINDS = Object.keys(SHAPES);
+
+/* ---------------- mesh templates ---------------- */
+const ICO = {};
+function icosphere(detail) {
+  if (ICO[detail]) return ICO[detail];
+  const t = (1 + Math.sqrt(5)) / 2, v = [];
+  const add = (x, y, z) => { const l = Math.hypot(x, y, z); v.push(x / l, y / l, z / l); return v.length / 3 - 1; };
+  [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]].forEach((a) => add(...a));
+  let f = [0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8, 3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1];
+  for (let d = 0; d < detail; d++) {
+    const cache = new Map();
+    const mid = (a, b) => {
+      const k = a < b ? a * 1e6 + b : b * 1e6 + a;
+      let m = cache.get(k);
+      if (m === undefined) { m = add(v[3 * a] + v[3 * b], v[3 * a + 1] + v[3 * b + 1], v[3 * a + 2] + v[3 * b + 2]); cache.set(k, m); }
+      return m;
+    };
+    const nf = [];
+    for (let i = 0; i < f.length; i += 3) {
+      const a = f[i], b = f[i + 1], c = f[i + 2], ab = mid(a, b), bc = mid(b, c), ca = mid(c, a);
+      nf.push(a, ab, ca, b, bc, ab, c, ca, bc, ab, bc, ca);
+    }
+    f = nf;
+  }
+  const N = v.length / 3;
+  const sets = Array.from({ length: N }, () => new Set());
+  for (let i = 0; i < f.length; i += 3) {
+    const a = f[i], b = f[i + 1], c = f[i + 2];
+    sets[a].add(b); sets[a].add(c); sets[b].add(a); sets[b].add(c); sets[c].add(a); sets[c].add(b);
+  }
+  const ns = new Uint32Array(N + 1), ni = [];
+  for (let i = 0; i < N; i++) { ns[i] = ni.length; for (const n of sets[i]) ni.push(n); }
+  ns[N] = ni.length;
+  return (ICO[detail] = { v: new Float32Array(v), f: N < 65536 ? new Uint16Array(f) : new Uint32Array(f), ns, ni: new Uint32Array(ni) });
+}
+
+function rayHit(sdf, dx, dy, dz, tMax) {
+  const steps = 220, st = tMax / steps;
+  let t = tMax, found = false;
+  for (let k = 0; k < steps; k++) { t -= st; if (sdf(dx * t, dy * t, dz * t) < 0) { found = true; break; } }
+  if (!found) return 0.05;
+  let lo = t, hi = t + st;
+  for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; if (sdf(dx * m, dy * m, dz * m) < 0) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+
+const decalMats = {};
+function decalMat(hex) {
+  return decalMats[hex] || (decalMats[hex] = new T3.MeshPhysicalMaterial({ color: lc(hex), roughness: 0.32, clearcoat: 0.7, clearcoatRoughness: 0.2 }));
+}
+
+const TEMPLATES = {};
+function template(key) {
+  if (TEMPLATES[key]) return TEMPLATES[key];
+  const sh = SHAPES[key], ico = icosphere(sh.detail), N = ico.v.length / 3;
+  const rest = new Float32Array(N * 3);
+  const [sx, sy, sz] = sh.S;
+  let mnx = 1e9, mny = 1e9, mnz = 1e9, mxx = -1e9, mxy = -1e9, mxz = -1e9;
+  for (let i = 0; i < N; i++) {
+    let dx = ico.v[3 * i] * sx, dy = ico.v[3 * i + 1] * sy, dz = ico.v[3 * i + 2] * sz;
+    const l = len3(dx, dy, dz); dx /= l; dy /= l; dz /= l;
+    const t = rayHit(sh.sdf, dx, dy, dz, sh.tMax);
+    const x = dx * t, y = dy * t, z = dz * t;
+    rest[3 * i] = x; rest[3 * i + 1] = y; rest[3 * i + 2] = z;
+    mnx = Math.min(mnx, x); mny = Math.min(mny, y); mnz = Math.min(mnz, z);
+    mxx = Math.max(mxx, x); mxy = Math.max(mxy, y); mxz = Math.max(mxz, z);
+  }
+  // voxel pass: mass, centre of mass, inertia, inscribed collider candidates
+  const hg = 0.08, inside = [];
+  let cx = 0, cy = 0, cz = 0;
+  for (let x = mnx + hg / 2; x < mxx; x += hg)
+    for (let y = mny + hg / 2; y < mxy; y += hg)
+      for (let z = mnz + hg / 2; z < mxz; z += hg) {
+        const d = sh.sdf(x, y, z);
+        if (d < 0) { inside.push(x, y, z, -d); cx += x; cy += y; cz += z; }
+      }
+  const cnt = inside.length / 4;
+  cx /= cnt; cy /= cnt; cz /= cnt;
+  let r2 = 0;
+  for (let i = 0; i < inside.length; i += 4) {
+    const x = inside[i] - cx, y = inside[i + 1] - cy, z = inside[i + 2] - cz;
+    r2 += x * x + y * y + z * z;
+  }
+  const dv = hg * hg * hg, mass = cnt * dv, inertia = (2 / 3) * r2 * dv;
+
+  // greedy set cover of the surface with inscribed spheres
+  const cand = [];
+  for (let i = 0; i < inside.length; i += 4) if (inside[i + 3] > 0.05) cand.push(i);
+  const stride = Math.max(1, Math.floor(N / 520)), samples = [];
+  for (let i = 0; i < N; i += stride) samples.push(rest[3 * i], rest[3 * i + 1], rest[3 * i + 2]);
+  const S = samples.length / 3, covered = new Uint8Array(S), cols = [];
+  let nCovered = 0;
+  for (let it = 0; it < 11 && nCovered < S * 0.975; it++) {
+    let best = -1, bestScore = 0;
+    for (const ci of cand) {
+      const x = inside[ci], y = inside[ci + 1], z = inside[ci + 2], d = inside[ci + 3], reach = (d + 0.14) * (d + 0.14);
+      let sc = 0;
+      for (let s = 0; s < S; s++) {
+        if (covered[s]) continue;
+        const ex = samples[3 * s] - x, ey = samples[3 * s + 1] - y, ez = samples[3 * s + 2] - z;
+        if (ex * ex + ey * ey + ez * ez < reach) sc++;
+      }
+      sc *= 0.6 + d;
+      if (sc > bestScore) { bestScore = sc; best = ci; }
+    }
+    if (best < 0) break;
+    const x = inside[best], y = inside[best + 1], z = inside[best + 2], d = inside[best + 3], reach = (d + 0.14) * (d + 0.14);
+    for (let s = 0; s < S; s++) {
+      if (covered[s]) continue;
+      const ex = samples[3 * s] - x, ey = samples[3 * s + 1] - y, ez = samples[3 * s + 2] - z;
+      if (ex * ex + ey * ey + ez * ez < reach) { covered[s] = 1; nCovered++; }
+    }
+    cols.push({ x: x - cx, y: y - cy, z: z - cz, r: d + 0.045 });
+  }
+
+  // recentre on the centre of mass
+  let R = 0;
+  for (let i = 0; i < N; i++) {
+    rest[3 * i] -= cx; rest[3 * i + 1] -= cy; rest[3 * i + 2] -= cz;
+    R = Math.max(R, len3(rest[3 * i], rest[3 * i + 1], rest[3 * i + 2]));
+  }
+  for (const c of cols) R = Math.max(R, len3(c.x, c.y, c.z) + c.r);
+
+  const surf = (dx, dy, dz) => { const l = len3(dx, dy, dz); return rayHit(sh.sdf, dx / l, dy / l, dz / l, sh.tMax); };
+  const decals = (sh.decals ? sh.decals(surf) : []).map((def) => ({
+    geo: def.geo, mat: decalMat(def.color),
+    items: def.items.map((it) => {
+      const px = it.p[0] - cx, py = it.p[1] - cy, pz = it.p[2] - cz;
+      let near = 0, bd = 1e9;
+      for (let i = 0; i < N; i++) {
+        const ex = rest[3 * i] - px, ey = rest[3 * i + 1] - py, ez = rest[3 * i + 2] - pz, d2 = ex * ex + ey * ey + ez * ez;
+        if (d2 < bd) { bd = d2; near = i; }
+      }
+      const m = new T3.Matrix4().compose(
+        new T3.Vector3(px, py, pz),
+        new T3.Quaternion().setFromEuler(new T3.Euler(it.r[0], it.r[1], it.r[2])),
+        new T3.Vector3(it.s[0], it.s[1], it.s[2])
+      );
+      return { px, py, pz, near, m };
+    }),
+  }));
+
+  return (TEMPLATES[key] = {
+    key, sh, N, rest, com: [cx, cy, cz], index: ico.f, ns: ico.ns, ni: ico.ni,
+    mass, inertia, cols, R, decals,
+  });
+}
+
+/* ---------------- renderer, scene ---------------- */
+const canvas = document.getElementById("scene");
+const renderer = new T3.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputEncoding = T3.sRGBEncoding;
+renderer.toneMapping = T3.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.92;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = T3.PCFSoftShadowMap;
+renderer.setClearColor(0x000000, 0);
+
+const scene = new T3.Scene();
+const camera = new T3.PerspectiveCamera(40, 1, 0.1, 200);
+
+(function environment() {
+  const pm = new T3.PMREMGenerator(renderer);
+  const s = new T3.Scene();
+  s.add(new T3.Mesh(new T3.SphereGeometry(30, 32, 16), new T3.MeshBasicMaterial({ color: new T3.Color(0.5, 0.56, 0.74), side: T3.BackSide })));
+  const panel = (w, h, x, y, z, c) => {
+    const m = new T3.Mesh(new T3.PlaneGeometry(w, h), new T3.MeshBasicMaterial({ color: c, side: T3.DoubleSide }));
+    m.position.set(x, y, z); m.lookAt(0, 0, 0); s.add(m);
+  };
+  panel(22, 10, 0, 18, 2, new T3.Color(3.2, 3.2, 3.4));
+  panel(8, 14, -16, 6, 7, new T3.Color(2.2, 2.2, 2.6));
+  panel(7, 7, 15, 5, -9, new T3.Color(2.6, 2.2, 1.9));
+  const fl = new T3.Mesh(new T3.CircleGeometry(30, 32), new T3.MeshBasicMaterial({ color: new T3.Color(0.3, 0.35, 0.55) }));
+  fl.rotation.x = -Math.PI / 2; fl.position.y = -4; s.add(fl);
+  scene.environment = pm.fromScene(s, 0.04).texture;
+  pm.dispose();
+})();
+
+scene.add(new T3.HemisphereLight(0xffffff, 0x8fa3dd, 0.35));
+const sun = new T3.DirectionalLight(0xffffff, 1.5);
+sun.position.set(5, 14, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10, near: 2, far: 40 });
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.03;
+sun.shadow.radius = 4;
+scene.add(sun);
+
+const TRAY_R = 7.6, WALL_R = 7.2, CEIL = 18;
+(function tray() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 1024;
+  const g = c.getContext("2d");
+  g.fillStyle = "#c9d8f7"; g.fillRect(0, 0, 1024, 1024);
+  g.strokeStyle = "rgba(96, 124, 204, 0.22)"; g.lineWidth = 3;
+  for (let r = 70; r < 512; r += 70) { g.beginPath(); g.arc(512, 512, r, 0, Math.PI * 2); g.stroke(); }
+  g.fillStyle = "rgba(255, 255, 255, 0.55)";
+  for (let i = 0; i < 2600; i++) {
+    const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 500;
+    g.fillRect(512 + Math.cos(a) * r, 512 + Math.sin(a) * r, 2, 2);
+  }
+  const tex = new T3.CanvasTexture(c);
+  tex.encoding = T3.sRGBEncoding;
+  tex.anisotropy = 8;
+  const base = new T3.Mesh(new T3.CylinderGeometry(TRAY_R + 0.15, TRAY_R + 0.55, 0.7, 128), new T3.MeshStandardMaterial({ color: lc("#8aa4ea"), roughness: 0.45 }));
+  base.position.y = -0.36; base.receiveShadow = true; scene.add(base);
+  const top = new T3.Mesh(new T3.CircleGeometry(TRAY_R, 128), new T3.MeshStandardMaterial({ map: tex, roughness: 0.75 }));
+  top.rotation.x = -Math.PI / 2; top.position.y = 0.002; top.receiveShadow = true; scene.add(top);
+  const rim = new T3.Mesh(new T3.TorusGeometry(TRAY_R, 0.4, 28, 180), new T3.MeshPhysicalMaterial({ color: lc("#6585ea"), roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.1 }));
+  rim.rotation.x = Math.PI / 2; rim.position.y = 0.1; rim.castShadow = true; rim.receiveShadow = true; scene.add(rim);
+})();
+
+const jellyMat = new T3.MeshPhysicalMaterial({
+  vertexColors: true, roughness: 0.16, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.06,
+  transparent: true, opacity: 0.93, envMapIntensity: 0.85,
+});
+jellyMat.onBeforeCompile = (s) => {
+  // fake subsurface glow: jelly lets light through, so its own colour leaks into the shadows
+  s.fragmentShader = s.fragmentShader.replace(
+    "#include <emissivemap_fragment>",
+    "#include <emissivemap_fragment>\n\ttotalEmissiveRadiance += vColor.rgb * 0.16;"
+  );
+};
+
+/* ---------------- jelly bodies ---------------- */
+const GRAV = -18;
+const SOFT = { K: 70, KC: 500, damp: 0.975, h: 1 / 120 };
+const bodies = [];
+const MAX = 24;
+
+class Jelly {
+  constructor(key, x, y, z, quat) {
+    const T = template(key);
+    this.T = T;
+    const N = T.N;
+    this.o = new Float32Array(N * 3);
+    this.vv = new Float32Array(N * 3);
+    this.pos = new Float32Array(T.rest);
+    const geo = new T3.BufferGeometry();
+    geo.setAttribute("position", new T3.BufferAttribute(this.pos, 3).setUsage(T3.DynamicDrawUsage));
+    geo.setIndex(new T3.BufferAttribute(T.index, 1));
+    const sh = T.sh, variant = sh.variants ? sh.variants[(Math.random() * sh.variants.length) | 0] : null;
+    const cols = new Float32Array(N * 3), [cx, cy, cz] = T.com;
+    for (let i = 0; i < N; i++) {
+      const c = sh.color(T.rest[3 * i] + cx, T.rest[3 * i + 1] + cy, T.rest[3 * i + 2] + cz, variant);
+      cols[3 * i] = Math.pow(c[0], 2.2); cols[3 * i + 1] = Math.pow(c[1], 2.2); cols[3 * i + 2] = Math.pow(c[2], 2.2);
+    }
+    geo.setAttribute("color", new T3.BufferAttribute(cols, 3));
+    geo.computeVertexNormals();
+    geo.boundingSphere = new T3.Sphere(new T3.Vector3(), T.R * 1.6);
+    this.geo = geo;
+    this.mesh = new T3.Mesh(geo, jellyMat);
+    this.mesh.castShadow = true;
+    this.mesh.receiveShadow = true;
+    this.mesh.userData.body = this;
+    this.decals = T.decals.map((d) => {
+      const im = new T3.InstancedMesh(d.geo, d.mat, d.items.length);
+      d.items.forEach((it, i) => im.setMatrixAt(i, it.m));
+      im.castShadow = true;
+      im.frustumCulled = false;
+      this.mesh.add(im);
+      return { im, items: d.items };
+    });
+
+    this.p = new T3.Vector3(x, y, z);
+    this.v = new T3.Vector3();
+    this.q = quat ? quat.clone() : new T3.Quaternion();
+    this.w = new T3.Vector3();
+    this.prevV = new T3.Vector3();
+    this.m = T.mass; this.im = 1 / T.mass;
+    this.iI = 1 / T.inertia;
+    this.wc = T.cols.map(() => new T3.Vector3());
+    this.R = T.R;
+    this.maxO = T.R * 0.36;
+    this.sleep = true;
+    this.imp = null;
+    this.mesh.position.copy(this.p);
+    this.mesh.quaternion.copy(this.q);
+  }
+  updateWC() {
+    const c = this.T.cols;
+    for (let k = 0; k < c.length; k++) this.wc[k].set(c[k].x, c[k].y, c[k].z).applyQuaternion(this.q).add(this.p);
+  }
+  shift(x, y, z) {
+    this.p.x += x; this.p.y += y; this.p.z += z;
+    for (const c of this.wc) { c.x += x; c.y += y; c.z += z; }
+  }
+  // squash on impact: the far side lags behind, the near side bulges out
+  impact(plx, ply, plz, dlx, dly, dlz, s) {
+    s = Math.min(s, 10);
+    const r = this.T.rest, v = this.vv, N = this.T.N, H = 1.6 * this.R;
+    for (let i = 0; i < N; i++) {
+      const i3 = 3 * i;
+      const rx = r[i3] - plx, ry = r[i3 + 1] - ply, rz = r[i3 + 2] - plz;
+      const along = rx * dlx + ry * dly + rz * dlz;
+      const hgt = clamp(along / H, 0, 1);
+      const px = rx - dlx * along, py = ry - dly * along, pz = rz - dlz * along;
+      const pl = len3(px, py, pz), inv = pl > 1e-4 ? 1 / pl : 0;
+      const lag = s * 0.3 * hgt;
+      const bul = s * 0.2 * (1 - hgt) * Math.min(1, pl / this.R) * inv;
+      v[i3] += -dlx * lag + px * bul;
+      v[i3 + 1] += -dly * lag + py * bul;
+      v[i3 + 2] += -dlz * lag + pz * bul;
+    }
+    this.sleep = false;
+  }
+  poke(plx, ply, plz, nlx, nly, nlz, strength) {
+    const r = this.T.rest, v = this.vv, N = this.T.N, sg = 0.5 * this.R, k = 1 / (sg * sg);
+    for (let i = 0; i < N; i++) {
+      const i3 = 3 * i;
+      const dx = r[i3] - plx, dy = r[i3 + 1] - ply, dz = r[i3 + 2] - plz;
+      const w = Math.exp(-(dx * dx + dy * dy + dz * dz) * k) * strength;
+      v[i3] -= nlx * w; v[i3 + 1] -= nly * w; v[i3 + 2] -= nlz * w;
+    }
+    this.sleep = false;
+  }
+  // lag of the flesh behind the point we hold it by
+  inertia(alx, aly, alz, glx, gly, glz, dt) {
+    const r = this.T.rest, v = this.vv, N = this.T.N, H = 1.8 * this.R;
+    for (let i = 0; i < N; i++) {
+      const i3 = 3 * i;
+      const w = clamp(len3(r[i3] - glx, r[i3 + 1] - gly, r[i3 + 2] - glz) / H, 0, 1) * dt;
+      v[i3] -= alx * w; v[i3 + 1] -= aly * w; v[i3 + 2] -= alz * w;
+    }
+    this.sleep = false;
+  }
+  soft(dt) {
+    if (this.sleep) return;
+    const T = this.T, N = T.N, o = this.o, v = this.vv, ns = T.ns, ni = T.ni;
+    const K = SOFT.K, KC = SOFT.KC, damp = SOFT.damp, maxO2 = this.maxO * this.maxO;
+    const steps = Math.max(1, Math.round(dt / SOFT.h)), h = dt / steps;
+    let e = 0;
+    for (let st = 0; st < steps; st++) {
+      for (let i = 0; i < N; i++) {
+        const s = ns[i], en = ns[i + 1];
+        let sx = 0, sy = 0, sz = 0;
+        for (let j = s; j < en; j++) { const n = ni[j] * 3; sx += o[n]; sy += o[n + 1]; sz += o[n + 2]; }
+        const inv = 1 / (en - s), i3 = 3 * i;
+        const ox = o[i3], oy = o[i3 + 1], oz = o[i3 + 2];
+        v[i3] = (v[i3] + (-K * ox + KC * (sx * inv - ox)) * h) * damp;
+        v[i3 + 1] = (v[i3 + 1] + (-K * oy + KC * (sy * inv - oy)) * h) * damp;
+        v[i3 + 2] = (v[i3 + 2] + (-K * oz + KC * (sz * inv - oz)) * h) * damp;
+      }
+      e = 0;
+      for (let i3 = 0; i3 < 3 * N; i3 += 3) {
+        let ox = o[i3] + v[i3] * h, oy = o[i3 + 1] + v[i3 + 1] * h, oz = o[i3 + 2] + v[i3 + 2] * h;
+        const m2 = ox * ox + oy * oy + oz * oz;
+        if (m2 > maxO2) { const s = Math.sqrt(maxO2 / m2); ox *= s; oy *= s; oz *= s; }
+        o[i3] = ox; o[i3 + 1] = oy; o[i3 + 2] = oz;
+        const en = v[i3] * v[i3] + v[i3 + 1] * v[i3 + 1] + v[i3 + 2] * v[i3 + 2] + K * m2;
+        if (en > e) e = en;
+      }
+    }
+    if (e < 2e-5 && grab.body !== this) { o.fill(0); v.fill(0); this.sleep = true; }
+    const r = T.rest, pa = this.pos;
+    for (let i = 0; i < 3 * N; i++) pa[i] = r[i] + o[i];
+    this.geo.attributes.position.needsUpdate = true;
+    this.geo.computeVertexNormals();
+    for (const d of this.decals) {
+      const a = d.im.instanceMatrix.array;
+      for (let k = 0; k < d.items.length; k++) {
+        const it = d.items[k], n = it.near * 3;
+        a[k * 16 + 12] = it.px + o[n]; a[k * 16 + 13] = it.py + o[n + 1]; a[k * 16 + 14] = it.pz + o[n + 2];
+      }
+      d.im.instanceMatrix.needsUpdate = true;
+    }
+  }
+  dispose() {
+    scene.remove(this.mesh);
+    this.geo.dispose();
+  }
+}
+
+/* ---------------- rigid-body physics (compound spheres) ---------------- */
+const MU = 0.6;
+function applyImpulse(b, jx, jy, jz, rx, ry, rz, angScale = 1) {
+  b.v.x += jx * b.im; b.v.y += jy * b.im; b.v.z += jz * b.im;
+  const s = b.iI * angScale;
+  b.w.x += (ry * jz - rz * jy) * s; b.w.y += (rz * jx - rx * jz) * s; b.w.z += (rx * jy - ry * jx) * s;
+}
+function pointVel(b, rx, ry, rz, out) {
+  out[0] = b.v.x + b.w.y * rz - b.w.z * ry;
+  out[1] = b.v.y + b.w.z * rx - b.w.x * rz;
+  out[2] = b.v.z + b.w.x * ry - b.w.y * rx;
+}
+function registerImpact(b, px, py, pz, nx, ny, nz, s) {
+  if (s < 1.2) return;
+  if (!b.imp || s > b.imp.s) b.imp = { px, py, pz, nx, ny, nz, s };
+}
+const va = [0, 0, 0], vb = [0, 0, 0];
+const crossLen2 = (rx, ry, rz, nx, ny, nz) => {
+  const cx = ry * nz - rz * ny, cy = rz * nx - rx * nz, cz = rx * ny - ry * nx;
+  return cx * cx + cy * cy + cz * cz;
+};
+
+// contact with the tray: n points into the body
+function staticContact(b, nx, ny, nz, pen, px, py, pz) {
+  const rx = px - b.p.x, ry = py - b.p.y, rz = pz - b.p.z;
+  pointVel(b, rx, ry, rz, va);
+  const vn = va[0] * nx + va[1] * ny + va[2] * nz;
+  if (vn < 0) {
+    const kn = b.im + crossLen2(rx, ry, rz, nx, ny, nz) * b.iI;
+    const e = vn < -2.5 ? 0.22 : 0;
+    const jn = -(1 + e) * vn / kn;
+    applyImpulse(b, nx * jn, ny * jn, nz * jn, rx, ry, rz);
+    pointVel(b, rx, ry, rz, va);
+    const vn2 = va[0] * nx + va[1] * ny + va[2] * nz;
+    const tx = va[0] - nx * vn2, ty = va[1] - ny * vn2, tz = va[2] - nz * vn2, tl = len3(tx, ty, tz);
+    if (tl > 1e-5) {
+      const ux = tx / tl, uy = ty / tl, uz = tz / tl;
+      const kt = b.im + crossLen2(rx, ry, rz, ux, uy, uz) * b.iI;
+      const jt = clamp(-tl / kt, -MU * jn, MU * jn);
+      applyImpulse(b, ux * jt, uy * jt, uz * jt, rx, ry, rz);
+    }
+    registerImpact(b, px, py, pz, nx, ny, nz, jn * b.im);
+    b.w.multiplyScalar(0.995);
+  }
+  const corr = Math.max(pen - 0.004, 0) * 0.8;
+  if (corr > 0) b.shift(nx * corr, ny * corr, nz * corr);
+}
+
+function pairContact(A, B, ca, ra, cb, rb) {
+  let nx = cb.x - ca.x, ny = cb.y - ca.y, nz = cb.z - ca.z;
+  const d2 = nx * nx + ny * ny + nz * nz, rs = ra + rb;
+  if (d2 >= rs * rs) return;
+  const d = Math.sqrt(d2);
+  if (d > 1e-6) { nx /= d; ny /= d; nz /= d; } else { nx = 0; ny = 1; nz = 0; }
+  const pen = rs - d;
+  const px = ca.x + nx * (ra - pen * 0.5), py = ca.y + ny * (ra - pen * 0.5), pz = ca.z + nz * (ra - pen * 0.5);
+  const ax = px - A.p.x, ay = py - A.p.y, az = pz - A.p.z;
+  const bx = px - B.p.x, by = py - B.p.y, bz = pz - B.p.z;
+  pointVel(A, ax, ay, az, va); pointVel(B, bx, by, bz, vb);
+  const vn = (vb[0] - va[0]) * nx + (vb[1] - va[1]) * ny + (vb[2] - va[2]) * nz;
+  if (vn < 0) {
+    const k = A.im + B.im + crossLen2(ax, ay, az, nx, ny, nz) * A.iI + crossLen2(bx, by, bz, nx, ny, nz) * B.iI;
+    const e = vn < -2.5 ? 0.25 : 0;
+    const j = -(1 + e) * vn / k;
+    applyImpulse(A, -nx * j, -ny * j, -nz * j, ax, ay, az);
+    applyImpulse(B, nx * j, ny * j, nz * j, bx, by, bz);
+    pointVel(A, ax, ay, az, va); pointVel(B, bx, by, bz, vb);
+    const rvx = vb[0] - va[0], rvy = vb[1] - va[1], rvz = vb[2] - va[2];
+    const vn2 = rvx * nx + rvy * ny + rvz * nz;
+    const tx = rvx - nx * vn2, ty = rvy - ny * vn2, tz = rvz - nz * vn2, tl = len3(tx, ty, tz);
+    if (tl > 1e-5) {
+      const ux = tx / tl, uy = ty / tl, uz = tz / tl;
+      const kt = A.im + B.im + crossLen2(ax, ay, az, ux, uy, uz) * A.iI + crossLen2(bx, by, bz, ux, uy, uz) * B.iI;
+      const jt = clamp(-tl / kt, -MU * j, MU * j);
+      applyImpulse(A, -ux * jt, -uy * jt, -uz * jt, ax, ay, az);
+      applyImpulse(B, ux * jt, uy * jt, uz * jt, bx, by, bz);
+    }
+    registerImpact(A, px, py, pz, -nx, -ny, -nz, j * A.im);
+    registerImpact(B, px, py, pz, nx, ny, nz, j * B.im);
+  }
+  const corr = Math.max(pen - 0.004, 0) * 0.6, tot = A.im + B.im;
+  if (corr > 0) {
+    const ka = corr * A.im / tot, kb = corr * B.im / tot;
+    A.shift(-nx * ka, -ny * ka, -nz * ka);
+    B.shift(nx * kb, ny * kb, nz * kb);
+  }
+}
+
+const grab = { body: null, active: false, local: new T3.Vector3(), target: new T3.Vector3(), id: -1, sx: 0, sy: 0, lift: 2.6 };
+const GK = 110, GC = 15;
+const tq = new T3.Quaternion(), tv = new T3.Vector3();
+
+function physicsStep(h) {
+  for (const b of bodies) {
+    b.v.y += GRAV * h;
+    if (grab.body === b && grab.active) {
+      tv.copy(grab.local).applyQuaternion(b.q);
+      const rx = tv.x, ry = tv.y, rz = tv.z;
+      pointVel(b, rx, ry, rz, va);
+      const ax = (grab.target.x - (b.p.x + rx)) * GK - va[0] * GC;
+      const ay = (grab.target.y - (b.p.y + ry)) * GK - va[1] * GC;
+      const az = (grab.target.z - (b.p.z + rz)) * GK - va[2] * GC;
+      applyImpulse(b, ax * b.m * h, ay * b.m * h, az * b.m * h, rx, ry, rz, 0.45);
+      b.w.multiplyScalar(0.97);
+    }
+    b.v.multiplyScalar(0.9995);
+    b.w.multiplyScalar(0.997);
+    const sp = b.v.length(); if (sp > 26) b.v.multiplyScalar(26 / sp);
+    const ws = b.w.length(); if (ws > 14) b.w.multiplyScalar(14 / ws);
+    b.p.addScaledVector(b.v, h);
+    tq.set(b.w.x * h * 0.5, b.w.y * h * 0.5, b.w.z * h * 0.5, 0).multiply(b.q);
+    b.q.set(b.q.x + tq.x, b.q.y + tq.y, b.q.z + tq.z, b.q.w + tq.w).normalize();
+    b.updateWC();
+  }
+  for (let it = 0; it < 2; it++) {
+    for (const b of bodies) {
+      const cs = b.T.cols;
+      for (let k = 0; k < cs.length; k++) {
+        const c = b.wc[k], r = cs[k].r;
+        if (c.y < r) staticContact(b, 0, 1, 0, r - c.y, c.x, c.y - r, c.z);
+        const rho = len2(c.x, c.z);
+        if (rho + r > WALL_R && rho > 1e-6) {
+          const nx = -c.x / rho, nz = -c.z / rho;
+          staticContact(b, nx, 0, nz, rho + r - WALL_R, c.x - nx * r, c.y, c.z - nz * r);
+        }
+        if (c.y + r > CEIL) staticContact(b, 0, -1, 0, c.y + r - CEIL, c.x, c.y + r, c.z);
+      }
+    }
+    for (let i = 0; i < bodies.length; i++) {
+      const A = bodies[i];
+      for (let j = i + 1; j < bodies.length; j++) {
+        const B = bodies[j];
+        const dx = B.p.x - A.p.x, dy = B.p.y - A.p.y, dz = B.p.z - A.p.z, rs = A.R + B.R;
+        if (dx * dx + dy * dy + dz * dz > rs * rs) continue;
+        const ca = A.T.cols, cb = B.T.cols;
+        for (let a = 0; a < ca.length; a++) for (let c = 0; c < cb.length; c++) pairContact(A, B, A.wc[a], ca[a].r, B.wc[c], cb[c].r);
+      }
+    }
+  }
+}
+
+/* ---------------- camera ---------------- */
+const cam = { theta: 0.62, phi: 0.96, r: 17, fit: 1, target: new T3.Vector3(0, 0.4, 0) };
+function placeCamera() {
+  const r = cam.r * cam.fit, sp = Math.sin(cam.phi);
+  camera.position.set(cam.target.x + r * sp * Math.sin(cam.theta), cam.target.y + r * Math.cos(cam.phi), cam.target.z + r * sp * Math.cos(cam.theta));
+  camera.lookAt(cam.target);
+}
+function resize() {
+  const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  cam.fit = clamp(1.3 / camera.aspect, 1, 1.75);
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* ---------------- spawning ---------------- */
+const countEl = document.getElementById("count");
+const updateCount = () => { countEl.textContent = `${bodies.length} / ${MAX}`; };
+function randQuat() {
+  return new T3.Quaternion().setFromEuler(new T3.Euler(Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28));
+}
+function spawn(key, x, y, z, q) {
+  if (x === undefined) {
+    const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 4.2;
+    x = Math.cos(a) * r; z = Math.sin(a) * r; y = 6 + Math.random() * 2;
+  }
+  const b = new Jelly(key, x, y, z, q || randQuat());
+  b.w.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(3);
+  bodies.push(b);
+  scene.add(b.mesh);
+  while (bodies.length > MAX) {
+    const old = bodies.shift();
+    if (grab.body === old) releaseGrab();
+    old.dispose();
+  }
+  updateCount();
+  return b;
+}
+
+const shelf = document.getElementById("shelf");
+for (const key of KINDS) {
+  const sh = SHAPES[key];
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "chip";
+  btn.id = "add-" + key;
+  btn.innerHTML = `<span class="dot"></span><span>${sh.name}</span>`;
+  const dot = btn.firstChild;
+  dot.style.setProperty("--c", sh.dot);
+  if (sh.ring) dot.style.setProperty("--ring", sh.ring);
+  btn.addEventListener("click", () => { if (ready) spawn(key); });
+  shelf.appendChild(btn);
+}
+document.getElementById("shake").addEventListener("click", () => {
+  for (const b of bodies) {
+    b.v.x += (Math.random() - 0.5) * 6; b.v.y += 7 + Math.random() * 5; b.v.z += (Math.random() - 0.5) * 6;
+    b.w.x += (Math.random() - 0.5) * 8; b.w.y += (Math.random() - 0.5) * 8; b.w.z += (Math.random() - 0.5) * 8;
+    b.impact(0, -b.R, 0, 0, 1, 0, 6);
+  }
+});
+document.getElementById("clear").addEventListener("click", () => {
+  releaseGrab();
+  while (bodies.length) bodies.pop().dispose();
+  updateCount();
+});
+
+/* ---------------- pointer: grab, poke, orbit, zoom ---------------- */
+const ray = new T3.Raycaster();
+const ndc = new T3.Vector2();
+const liftPlane = new T3.Plane(new T3.Vector3(0, 1, 0), 0);
+const pointers = new Map();
+let mode = null, pinch0 = 0, pinchR = 0, orbitId = -1;
+
+function setRay(x, y) {
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+}
+function pick(x, y) {
+  setRay(x, y);
+  const hit = ray.intersectObjects(bodies.map((b) => b.mesh), false)[0];
+  return hit ? { body: hit.object.userData.body, point: hit.point, normal: hit.face ? hit.face.normal : new T3.Vector3(0, 1, 0) } : null;
+}
+function releaseGrab() {
+  if (grab.body && grab.active) {
+    const b = grab.body;
+    b.w.multiplyScalar(0.6);
+  }
+  grab.body = null; grab.active = false; grab.id = -1;
+  canvas.classList.remove("dragging");
+}
+function updateGrabTarget(x, y) {
+  setRay(x, y);
+  liftPlane.constant = -grab.lift;
+  if (ray.ray.intersectPlane(liftPlane, tv)) {
+    const rho = len2(tv.x, tv.z), lim = WALL_R - 0.9;
+    if (rho > lim) { tv.x *= lim / rho; tv.z *= lim / rho; }
+    grab.target.copy(tv);
+  }
+}
+
+canvas.addEventListener("pointerdown", (e) => {
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) {
+    releaseGrab();
+    mode = "pinch";
+    const [a, b] = [...pointers.values()];
+    pinch0 = Math.hypot(a.x - b.x, a.y - b.y) || 1; pinchR = cam.r;
+    return;
+  }
+  if (pointers.size > 2) return;
+  const hit = ready && pick(e.clientX, e.clientY);
+  if (hit) {
+    const b = hit.body;
+    mode = "grab";
+    grab.body = b; grab.active = false; grab.id = e.pointerId; grab.sx = e.clientX; grab.sy = e.clientY;
+    tq.copy(b.q).conjugate();
+    grab.local.copy(hit.point).sub(b.p).applyQuaternion(tq);
+    const nl = hit.normal;
+    b.poke(grab.local.x, grab.local.y, grab.local.z, nl.x, nl.y, nl.z, 5.5);
+  } else {
+    mode = "orbit"; orbitId = e.pointerId;
+  }
+});
+canvas.addEventListener("pointermove", (e) => {
+  const prev = pointers.get(e.pointerId);
+  if (!prev) {
+    if (ready && e.pointerType === "mouse") canvas.classList.toggle("on-jelly", !!pick(e.clientX, e.clientY));
+    return;
+  }
+  const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+  prev.x = e.clientX; prev.y = e.clientY;
+  if (mode === "pinch" && pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    cam.r = clamp(pinchR * pinch0 / (Math.hypot(a.x - b.x, a.y - b.y) || 1), 8, 32);
+  } else if (mode === "orbit" && e.pointerId === orbitId) {
+    cam.theta -= dx * 0.006;
+    cam.phi = clamp(cam.phi - dy * 0.005, 0.3, 1.36);
+  } else if (mode === "grab" && e.pointerId === grab.id && grab.body) {
+    if (!grab.active && Math.hypot(e.clientX - grab.sx, e.clientY - grab.sy) > 5) {
+      grab.active = true;
+      grab.body.sleep = false;
+      canvas.classList.add("dragging");
+    }
+    if (grab.active) updateGrabTarget(e.clientX, e.clientY);
+  }
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (mode === "grab" && e.pointerId === grab.id) releaseGrab();
+  if (pointers.size === 0) mode = null;
+  else if (mode === "pinch" && pointers.size < 2) mode = null;
+}
+canvas.addEventListener("pointerup", endPointer);
+canvas.addEventListener("pointercancel", endPointer);
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  cam.r = clamp(cam.r * Math.exp(e.deltaY * 0.001), 8, 32);
+}, { passive: false });
+
+/* ---------------- main loop ---------------- */
+let last = performance.now(), ready = false;
+const lv = new T3.Vector3();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 1 / 30);
+  last = now;
+  if (dt > 0) {
+    for (const b of bodies) b.prevV.copy(b.v);
+    const sub = 3;
+    for (let s = 0; s < sub; s++) physicsStep(dt / sub);
+    for (const b of bodies) {
+      tq.copy(b.q).conjugate();
+      if (b.imp) {
+        const im = b.imp;
+        const pl = tv.set(im.px, im.py, im.pz).sub(b.p).applyQuaternion(tq);
+        const plx = pl.x, ply = pl.y, plz = pl.z;
+        const dl = tv.set(im.nx, im.ny, im.nz).applyQuaternion(tq);
+        b.impact(plx, ply, plz, dl.x, dl.y, dl.z, im.s);
+        b.imp = null;
+      }
+      if (grab.body === b && grab.active) {
+        // acceleration felt by the jelly relative to free fall
+        lv.copy(b.v).sub(b.prevV).divideScalar(dt);
+        lv.y -= GRAV;
+        if (lv.length() > 70) lv.setLength(70);
+        lv.applyQuaternion(tq).multiplyScalar(0.5);
+        b.inertia(lv.x, lv.y, lv.z, grab.local.x, grab.local.y, grab.local.z, dt);
+      }
+      b.soft(dt);
+      b.mesh.position.copy(b.p);
+      b.mesh.quaternion.copy(b.q);
+    }
+  }
+  placeCamera();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------------- boot: cook the jellies one by one ---------------- */
+const loading = document.getElementById("loading");
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+(async function boot() {
+  for (const key of KINDS) {
+    loading.textContent = `Варим желе: ${SHAPES[key].name.toLowerCase()}…`;
+    await nextFrame();
+    template(key);
+  }
+  loading.hidden = true;
+  ready = true;
+  KINDS.forEach((key, i) => {
+    const a = (i / KINDS.length) * Math.PI * 2 + 0.3, r = i % 2 ? 3.9 : 2.3;
+    setTimeout(() => spawn(key, Math.cos(a) * r, 1.6 + i * 0.35, Math.sin(a) * r), i * 110);
+  });
+})();
+})();
+</script>
+</body>
+</html>
