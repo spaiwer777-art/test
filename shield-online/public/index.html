@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Протокол «Щит» — терминал защиты сервера</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/banner.css">
+</head>
+<body class="game">
+  <canvas id="matrix-bg" class="matrix-bg" aria-hidden="true"></canvas>
+
+  <div class="matrix-banner" id="matrix-banner" hidden>
+    <div class="matrix-banner__title">МАТРИЦА ЗАПУЩЕНА</div>
+    <div class="matrix-banner__sub" id="matrix-banner-sub"></div>
+  </div>
+
+  <div class="app">
+    <header class="topbar panel">
+      <div class="brand">
+        <div class="brand__title" id="brand-title">ПРОТОКОЛ «ЩИТ»</div>
+        <div class="brand__sub">
+          <span id="server-name">SRV</span> · <span id="team-name">—</span>
+        </div>
+      </div>
+      <div class="join-mini" id="join-mini" hidden>
+        <div class="join-mini__label">Агенты в игре</div>
+        <div class="join-mini__teams" id="teams-online">—</div>
+        <button class="btn join-mini__btn" type="button" id="join-open">QR подключения</button>
+      </div>
+      <div class="gate-mini" id="gate-mini" hidden>
+        <div class="gate-mini__label">Матрица</div>
+        <div class="gate-mini__value" id="gate-mini-value"></div>
+      </div>
+      <div class="server-status" id="server-status">Сервер заражён</div>
+      <div class="clock" id="clock-box">
+        <div class="clock__label">До полного шифрования</div>
+        <div class="clock__value" id="clock">00:00</div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel">
+        <h2 class="panel__title">Угрозы <span class="panel__count" id="stages-count"></span></h2>
+        <ol class="stages" id="stages"></ol>
+      </aside>
+
+      <section class="panel mission" id="mission">
+        <div class="report" id="report" hidden>
+          <img class="report__img" id="report-img" alt="">
+          <div>
+            <div class="report__title" id="report-title"></div>
+            <div class="report__text" id="report-text"></div>
+          </div>
+        </div>
+
+        <div id="overview">
+          <div class="mission__label" id="mission-label"></div>
+          <h1 class="mission__title" id="mission-title"></h1>
+          <p class="mission__text" id="mission-text"></p>
+          <p class="mission__hint" id="mission-hint" hidden></p>
+          <ol class="howto" id="howto" hidden></ol>
+        </div>
+
+        <div class="task" id="task" hidden>
+          <div class="task__head">
+            <img class="task__img" id="task-img" alt="">
+            <div>
+              <div class="mission__label" id="task-label"></div>
+              <h1 class="mission__title" id="task-title"></h1>
+              <div class="task__where" id="task-where"></div>
+            </div>
+          </div>
+          <div class="task__row">
+            <div class="task__key">Что сделать</div>
+            <div class="task__value" id="task-text"></div>
+          </div>
+          <div class="task__row">
+            <div class="task__key">Ответ</div>
+            <div class="task__value" id="task-format"></div>
+          </div>
+          <div class="task__hint" id="task-hint" hidden></div>
+          <div class="task__actions">
+            <button class="btn" type="button" id="task-hint-btn">Подсказка</button>
+            <button class="btn" type="button" id="task-back">Все угрозы</button>
+          </div>
+        </div>
+
+        <div class="masterkey" id="masterkey">
+          <div class="masterkey__label">Мастер-ключ</div>
+          <div class="slots" id="slots"></div>
+        </div>
+
+        <form class="key-form" id="key-form" autocomplete="off">
+          <span class="key-form__prompt">&gt;</span>
+          <input class="key-input" id="key-input" type="text" placeholder="введите ключ"
+                 spellcheck="false" autocomplete="off" autocapitalize="off" maxlength="60">
+          <button class="btn btn--primary" type="submit" id="key-submit">Отправить</button>
+        </form>
+        <div class="feedback" id="feedback" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <footer class="panel infection">
+      <div class="infection__head">
+        <span>Зашифровано данных вирусом <b id="virus-name">VIRUS</b></span>
+        <span class="infection__pct" id="infection-pct">0%</span>
+      </div>
+      <div class="bar"><div class="bar__fill" id="infection-bar"></div></div>
+      <div class="log" id="log"></div>
+    </footer>
+  </div>
+
+  <!-- Брифинг -->
+  <div class="overlay" id="intro" hidden>
+    <div class="modal modal--wide modal--intro">
+      <div class="modal__alert">Обнаружено вторжение</div>
+      <h1 class="modal__title" id="intro-title"></h1>
+
+      <!-- Шаг 1: агенты и капитан подключаются к игре по QR-кодам -->
+      <div class="lobby" id="lobby" hidden>
+        <div class="lobby__main">
+          <div class="lobby__code-title">Агенты</div>
+          <div class="lobby__qr" data-join-qr="play"></div>
+        </div>
+        <div class="lobby__side">
+          <div class="lobby__captain">
+            <div class="lobby__qr lobby__qr--small" data-join-qr="captain"></div>
+            <div>
+              <div class="lobby__code-title">Капитан</div>
+              <div class="lobby__captain-state" data-lobby-captain>Ждём капитана…</div>
+            </div>
+          </div>
+          <p class="lobby__lead">Каждый агент наводит камеру телефона на QR-код и вводит своё имя. Капитан сканирует свой QR — он будет решать, кто идёт в Матрицу.</p>
+          <ul class="lobby__players" data-lobby-players></ul>
+          <p class="lobby__count" id="lobby-count"></p>
+        </div>
+      </div>
+
+      <!-- Шаг 2: брифинг -->
+      <div class="briefing" id="briefing"></div>
+
+      <form id="intro-form" class="intro-form intro-form--single" autocomplete="off">
+        <button class="btn btn--primary btn--big" type="button" id="lobby-next" hidden>Все на месте — к брифингу</button>
+        <button class="btn btn--primary btn--big" type="submit" id="intro-start">Подключиться к серверу</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Подключение телефонов -->
+  <div class="overlay" id="join" hidden>
+    <div class="modal modal--wide">
+      <div class="modal__alert modal__alert--ok">Подключение к игре</div>
+      <h2 class="modal__title">Наведите камеру телефона на QR-код</h2>
+      <div class="lobby lobby--overlay">
+        <div class="lobby__main">
+          <div class="lobby__code-title">Агенты</div>
+          <div class="lobby__qr" data-join-qr="play"></div>
+        </div>
+        <div class="lobby__side">
+          <div class="lobby__captain">
+            <div class="lobby__qr lobby__qr--small" data-join-qr="captain"></div>
+            <div>
+              <div class="lobby__code-title">Капитан</div>
+              <div class="lobby__captain-state" data-lobby-captain>Ждём капитана…</div>
+            </div>
+          </div>
+          <ul class="lobby__players" data-lobby-players></ul>
+        </div>
+      </div>
+      <button class="btn" type="button" id="join-close">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- Пауза -->
+  <div class="overlay" id="paused" hidden>
+    <div class="modal">
+      <div class="modal__alert modal__alert--warn">Пауза</div>
+      <h2 class="modal__title">Связь с сервером приостановлена оператором</h2>
+      <p>Время остановлено. Ждите команды ведущего.</p>
+    </div>
+  </div>
+
+  <!-- Победа -->
+  <div class="overlay overlay--win" id="win" hidden>
+    <div class="modal modal--wide">
+      <div class="modal__alert modal__alert--ok">Угроза устранена</div>
+      <h1 class="modal__title">Сервер защищён</h1>
+      <p class="modal__lead" id="win-lead"></p>
+      <div class="stats" id="win-stats"></div>
+      <div class="keys" id="win-keys"></div>
+    </div>
+  </div>
+
+  <!-- Поражение -->
+  <div class="overlay overlay--lost" id="lost" hidden>
+    <div class="modal modal--wide">
+      <div class="modal__alert">Критический сбой</div>
+      <h1 class="modal__title">Данные зашифрованы</h1>
+      <p class="modal__lead" id="lost-lead"></p>
+      <p class="muted">Ведущий может выделить резервное время через панель организатора.</p>
+    </div>
+  </div>
+
+  <!-- Панель организатора -->
+  <div class="overlay" id="admin" hidden>
+    <div class="modal modal--wide">
+      <div class="modal__alert modal__alert--warn">Панель организатора</div>
+      <form id="admin-login" class="intro-form" autocomplete="off">
+        <label class="field">
+          <span class="field__label">PIN</span>
+          <input class="key-input" id="admin-pin" type="password" inputmode="numeric">
+        </label>
+        <button class="btn btn--primary" type="submit">Войти</button>
+        <button class="btn" type="button" data-admin="close">Закрыть</button>
+      </form>
+      <div id="admin-controls" hidden>
+        <div class="admin-info" id="admin-info"></div>
+        <div class="admin-grid">
+          <button class="btn" type="button" data-admin="pause">Пауза / продолжить</button>
+          <button class="btn" type="button" data-admin="unlock">Снять блокировку ввода</button>
+          <button class="btn" type="button" data-admin="plus1">+1 мин команде</button>
+          <button class="btn" type="button" data-admin="plus5">+5 мин команде</button>
+          <button class="btn" type="button" data-admin="minus1">Штраф −1 мин</button>
+          <button class="btn" type="button" data-admin="minus2">Штраф −2 мин (подсказка)</button>
+          <button class="btn" type="button" data-admin="matrix-open">Открыть Матрицу сейчас</button>
+          <button class="btn" type="button" data-admin="captain-reset">Сменить капитана</button>
+        </div>
+        <label class="field">
+          <span class="field__label">Угроза</span>
+          <select class="key-input admin-select" id="admin-stage"></select>
+        </label>
+        <div class="admin-grid admin-grid--three">
+          <button class="btn" type="button" data-admin="answer">Показать ответ</button>
+          <button class="btn" type="button" data-admin="solve">Засчитать</button>
+          <button class="btn" type="button" data-admin="unsolve">Отменить</button>
+        </div>
+        <div class="admin-grid">
+          <button class="btn btn--danger" type="button" data-admin="reset">Новая игра (сброс)</button>
+        </div>
+        <div class="admin-answer" id="admin-answer"></div>
+        <button class="btn" type="button" data-admin="close">Закрыть панель</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/matrix-bg.js"></script>
+  <script src="js/qrcode.js"></script>
+  <script src="js/join.js"></script>
+  <script src="js/host-login.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

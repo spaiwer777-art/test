@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Протокол «Щит» — запуск</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="matrix-bg" class="matrix-bg" aria-hidden="true"></canvas>
+  <div class="start">
+    <div class="brand__title">ПРОТОКОЛ «ЩИТ»</div>
+    <p class="start__lead">Школьный сервер атакован шифровальщиком. Выберите, что открыть на этом устройстве.</p>
+
+    <div class="start__grid">
+      <a class="start__card" href="index.html">
+        <div class="start__name">Терминал защиты</div>
+        <div class="start__desc">Главный экран игры на компьютере или проекторе ведущего. Нужен ключ ведущего.</div>
+      </a>
+      <a class="start__card" href="timer.html">
+        <div class="start__name">Запасной таймер</div>
+        <div class="start__desc">Если у бегунов нет телефонов: таймер Матрицы на отдельном устройстве, без связи с игрой.</div>
+      </a>
+      <a class="start__card" href="setup.html">
+        <div class="start__name">Конструктор игры</div>
+        <div class="start__desc">Выберите, какие фигурки участвуют в игре. Для ведущего, до начала игры.</div>
+      </a>
+      <a class="start__card" href="qr.html">
+        <div class="start__name">QR-коды</div>
+        <div class="start__desc">Плакат подключения и наклейки для фигурок. Для ведущего.</div>
+      </a>
+      <a class="start__card" href="print/blank_agenta.html">
+        <div class="start__name">Бланк агента</div>
+        <div class="start__desc">Лист для печати, один на класс.</div>
+      </a>
+    </div>
+
+    <div class="start__addr" id="addr" hidden>
+      Адрес игры — откройте его на телефонах:
+      <div class="start__url" id="addr-url"></div>
+      <div class="muted">Откройте этот адрес в браузере телефона — подойдёт любой интернет.</div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/matrix-bg.js"></script>
+  <script src="js/host-login.js"></script>
+  <script>
+    window.MatrixBg.setLevel(0.12);
+    // Ведущий вошёл в этом браузере — показываем, как выйти (важно на общем компьютере).
+    if (window.HostLogin.has()) {
+      const bar = document.createElement("p");
+      bar.className = "muted host-login__status";
+      bar.textContent = "Вы вошли как ведущий. ";
+      const out = document.createElement("a");
+      out.href = "#";
+      out.textContent = "Выйти";
+      out.addEventListener("click", function (e) { e.preventDefault(); window.HostLogin.logout(); });
+      bar.appendChild(out);
+      document.querySelector(".start").appendChild(bar);
+    }
+    // Название «расшифровывается» при открытии страницы.
+    (function () {
+      const title = document.querySelector(".brand__title");
+      const text = title.textContent;
+      const glyphs = "ｱｲｳｴｵｶｷｸｹｺ0123456789ЖЩЫЮЯ#%&";
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      let frame = 0;
+      const timer = setInterval(function () {
+        frame++;
+        const solved = Math.floor(frame / 2);
+        title.textContent = text.split("").map(function (ch, i) {
+          if (i < solved || ch === " ") return ch;
+          return glyphs[Math.floor(Math.random() * glyphs.length)];
+        }).join("");
+        if (solved >= text.length) { clearInterval(timer); title.textContent = text; }
+      }, 45);
+    })();
+    if (location.protocol.indexOf("http") === 0) {
+      const addr = document.getElementById("addr");
+      const addrUrl = document.getElementById("addr-url");
+      addr.hidden = false;
+      addrUrl.textContent = new URL(".", location.href).href;
+      fetch("api/info", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (info) {
+          if (info.urls && info.urls.length) addrUrl.textContent = info.urls[0];
+        })
+        .catch(function () { /* старый сервер без api/info — оставляем текущий адрес */ });
+    }
+  </script>
+</body>
+</html>

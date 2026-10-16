@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Протокол «Щит» — капитан</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="matrix-bg" class="matrix-bg" aria-hidden="true"></canvas>
+
+  <div class="play">
+    <div class="brand__title">ПРОТОКОЛ «ЩИТ»</div>
+
+    <!-- Назначение капитана -->
+    <form id="claim-form" class="play__join" hidden autocomplete="off">
+      <p class="start__lead">Ты — капитан Отдела ИБ. Ты решаешь, кто из агентов пойдёт в Матрицу. Как тебя зовут?</p>
+      <input class="key-input" id="claim-name" type="text" maxlength="24" placeholder="Имя капитана" autocapitalize="words">
+      <button class="btn btn--primary btn--big" type="submit">Стать капитаном</button>
+      <p class="play__error" id="claim-error" hidden></p>
+    </form>
+
+    <!-- Пульт капитана -->
+    <div id="cap" hidden>
+      <div class="play__team">
+        <div class="play__team-name" id="cap-name"></div>
+        <div class="muted" id="cap-clock"></div>
+      </div>
+
+      <div class="panel cap__matrix" id="cap-matrix">
+        <h2 class="panel__title">Матрица</h2>
+        <div class="cap__phase" id="cap-phase"></div>
+        <div class="cap__time" id="cap-time"></div>
+        <div class="muted" id="cap-note"></div>
+        <div class="cap__actions" id="cap-actions"></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel__title">Кого отправить <span class="panel__count" id="cap-picked"></span></h2>
+        <p class="muted cap__hint">Выбери агентов и нажми «Отправить в Матрицу». Сверху — те, кто был в Матрице меньше всех.</p>
+        <ul class="cap__players" id="cap-players"></ul>
+        <button class="btn btn--primary btn--big cap__send" type="button" id="cap-send" disabled>Отправить в Матрицу</button>
+      </div>
+    </div>
+
+    <div class="play__link-state" id="link">Подключение…</div>
+  </div>
+
+  <script src="js/sound.js"></script>
+  <script src="js/matrix-bg.js"></script>
+  <script src="js/captain.js"></script>
+</body>
+</html>

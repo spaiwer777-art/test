@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Бланк агента — Протокол «Щит»</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  body { font: 14px/1.4 "Segoe UI", Arial, sans-serif; color: #000; margin: 0; }
+  .sheet { max-width: 186mm; margin: 0 auto; padding: 6mm 0; }
+  h1 { font-family: Consolas, "Courier New", monospace; letter-spacing: .1em; margin: 0 0 4px; font-size: 24px; }
+  .sub { color: #444; margin-bottom: 10px; }
+  .row { display: flex; gap: 10px; margin: 8px 0; }
+  .row label { flex: 1; border-bottom: 1px solid #000; padding: 6px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { border: 1.5px solid #000; padding: 6px 8px; text-align: left; }
+  th { background: #eee; }
+  td.n { width: 28px; text-align: center; font-weight: 700; }
+  td.key { width: 38%; }
+  td.chk { width: 34px; }
+  .roles td { height: 22px; }
+  .rules { border: 1.5px dashed #000; padding: 8px 12px; border-radius: 6px; }
+  .rules ul { margin: 4px 0; padding-left: 20px; }
+  .print-btn { position: fixed; top: 10px; right: 10px; padding: 8px 14px; font-size: 15px; }
+  @media print { .print-btn { display: none; } }
+</style>
+</head>
+<body>
+<button class="print-btn" onclick="window.print()">Печать</button>
+<div class="sheet">
+  <h1>БЛАНК АГЕНТА · ПРОТОКОЛ «ЩИТ»</h1>
+  <div class="sub">Отдел информационной безопасности · сервер SRV-SCHOOL-01 · совершенно секретно</div>
+
+  <div class="row"><label>Класс:</label><label>Дата:</label></div>
+
+  <table class="roles">
+    <tr><th style="width:34%">Роль</th><th>Агент(ы)</th></tr>
+    <tr><td>Капитан (выбирает бегунов на телефоне, вводит ключи)</td><td></td></tr>
+    <tr><td>Хранитель бланка (записывает ключи)</td><td></td></tr>
+  </table>
+
+  <table>
+    <tr><th>№</th><th>Угроза (фигурка)</th><th>Ключ</th><th>✓</th></tr>
+    <tr><td class="n">1</td><td>Троянский конь (Trojan Horse)</td><td class="key"></td><td class="chk"></td></tr>
+    <tr><td class="n">2</td><td>Шифровальщик WannaCry</td><td class="key"></td><td class="chk"></td></tr>
+    <tr><td class="n">3</td><td>Червь Морриса (Morris Worm)</td><td class="key"></td><td class="chk"></td></tr>
+    <tr><td class="n">4</td><td>Компьютерный вирус (Virus)</td><td class="key"></td><td class="chk"></td></tr>
+    <tr><td class="n">5</td><td>Программа-шпион (Spyware)</td><td class="key"></td><td class="chk"></td></tr>
+    <tr><td class="n">6</td><td>Heartbleed</td><td class="key"></td><td class="chk"></td></tr>
+    <tr><td class="n">7</td><td>Фишинг (Phishing)</td><td class="key"></td><td class="chk"></td></tr>
+    <tr><td class="n">8</td><td>Log4Shell</td><td class="key"></td><td class="chk"></td></tr>
+    <tr><td class="n">9</td><td>Spectre</td><td class="key"></td><td class="chk"></td></tr>
+    <tr><td class="n">10</td><td>Уязвимость нулевого дня (Zero-Day)</td><td class="key"></td><td class="chk"></td></tr>
+    <tr><td class="n">11</td><td>Червь ILOVEYOU</td><td class="key"></td><td class="chk"></td></tr>
+  </table>
+
+  <div class="rules">
+    <b>Правила Матрицы</b>
+    <ul>
+      <li>В Матрицу идут 2 агента, которых выбрал капитан. Капитан старается, чтобы побегали все.</li>
+      <li>У выбранных на телефонах включается таймер Матрицы. На границе нажмите «Вошли», на выходе — «Вышли».</li>
+      <li>В Матрице можно быть 1 минуту. Опоздание — сирена и штраф.</li>
+      <li>За один заход — QR-коды не больше чем 2 фигурок. Порядок любой.</li>
+      <li>После выхода Матрица перезагружается 5 минут — входить нельзя.</li>
+      <li>Задание открывается на телефоне бегуна. Решили — ответ капитану.</li>
+      <li>Неверный ключ ускоряет вирус на 1 минуту, подсказка на терминале — на 2 минуты. Не угадывайте — решайте!</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

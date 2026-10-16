@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Протокол «Щит» — QR-коды для печати</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Строки развёртки мешают сканировать QR прямо с экрана. */
+    body::after { display: none; }
+    .qr-tools { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin: 0 0 28px; }
+    .qr-tools .field { min-width: min(420px, 100%); }
+    .qr-error { border: 1px solid var(--red); color: var(--red); padding: 14px 18px; margin-bottom: 24px; line-height: 1.5; }
+    .qr-steps { margin: 0 0 24px; padding-left: 22px; line-height: 1.6; max-width: 70ch; }
+
+    .stickers {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, 62mm);
+      justify-content: center;
+      gap: 6mm;
+      max-width: 1000px;
+      margin: 0 auto 48px;
+      padding: 0 16px;
+    }
+    .sticker {
+      width: 62mm;
+      height: 84mm;
+      background: #fff;
+      color: #000;
+      border: 1px dashed #000;
+      padding: 4mm;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      justify-items: center;
+      text-align: center;
+      font-family: var(--font);
+      break-inside: avoid;
+    }
+    .sticker__head { width: 100%; display: flex; justify-content: space-between; align-items: baseline; font-family: var(--display); }
+    .sticker__num { font-size: 26px; font-weight: 800; }
+    .sticker__tag { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; }
+    .sticker__qr { width: 48mm; align-self: center; }
+    .sticker__qr svg { width: 100%; height: auto; display: block; }
+    .sticker__name { font-weight: 700; font-size: 12px; line-height: 1.25; }
+    .sticker__hint { font-size: 9px; margin-top: 2px; }
+
+    /* Плакат подключения: отдельный лист A4 для стены штаба. */
+    .poster {
+      position: relative;
+      z-index: 1;
+      width: 190mm;
+      max-width: calc(100% - 32px);
+      margin: 0 auto 32px;
+      background: #fff;
+      color: #000;
+      border: 1px dashed #000;
+      padding: 10mm;
+      text-align: center;
+      font-family: var(--font);
+    }
+    .poster h2 { font-family: var(--display); font-size: 30px; margin: 0 0 4mm; }
+    .poster__lead { margin: 0 0 8mm; font-size: 16px; }
+    .poster__codes { display: flex; justify-content: center; gap: 12mm; flex-wrap: wrap; }
+    .poster__card { width: 120mm; }
+    .poster__step { font-family: var(--display); font-weight: 800; font-size: 18px; margin-top: 4mm; }
+    .poster__card svg { width: 100%; height: auto; display: block; }
+    .poster__note { font-size: 12px; margin-top: 3mm; word-break: break-all; }
+    .poster__steps { text-align: left; margin: 8mm auto 0; max-width: 150mm; font-size: 15px; line-height: 1.6; }
+
+    @media print {
+      @page { size: A4; margin: 10mm; }
+      .poster { width: auto; max-width: none; margin: 0; border: 0; break-after: page; }
+      html, body { background: #fff !important; }
+      body::after, .matrix-bg, .no-print { display: none !important; }
+      .stickers { gap: 4mm; padding: 0; max-width: none; justify-content: start; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="matrix-bg" class="matrix-bg" aria-hidden="true"></canvas>
+
+  <div class="start no-print">
+    <div class="brand__title">QR-коды</div>
+    <p class="start__lead">Первый лист — плакат подключения для штаба. Дальше — наклейки: вырежьте по пунктиру и наклейте каждую на фигурку с тем же номером.</p>
+
+    <div class="qr-error" id="error" hidden></div>
+
+    <ol class="qr-steps">
+      <li>Эта страница — для ведущего (вход по ключу ведущего). Печатать можно с любого компьютера.</li>
+      <li>Проверьте адрес ниже: в QR-кодах будет этот адрес сайта. Телефонам агентов нужен только интернет.</li>
+      <li>Отсканируйте пару наклеек телефоном прямо с экрана, чтобы убедиться, что задание открывается.</li>
+      <li>Если адрес сайта сменился (другой хостинг или домен), распечатайте наклейки заново.</li>
+    </ol>
+
+    <div class="qr-tools">
+      <label class="field">
+        <span class="field__label">Адрес сайта в QR-кодах</span>
+        <select class="key-input admin-select" id="base"></select>
+      </label>
+      <button class="btn btn--primary" type="button" id="print">Печать</button>
+    </div>
+  </div>
+
+  <div class="poster" id="poster" hidden>
+    <h2>Подключитесь к игре</h2>
+    <p class="poster__lead">Протокол «Щит» · наведите камеру телефона на QR-код</p>
+    <div class="poster__codes" id="poster-codes"></div>
+    <ol class="poster__steps">
+      <li>Каждый агент наводит камеру телефона на QR-код и вводит своё имя — оно загорится на экране терминала.</li>
+      <li>Капитан на своём телефоне выбирает, кто идёт в Матрицу. У выбранных включается таймер Матрицы.</li>
+      <li>Задания — на QR-кодах фигурок в Матрице. Не больше 2 фигурок за заход.</li>
+    </ol>
+  </div>
+
+  <div class="stickers" id="stickers"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/matrix-bg.js"></script>
+  <script src="js/qrcode.js"></script>
+  <script src="js/join.js"></script>
+  <script src="js/host-login.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const C = window.QUEST_CONFIG || {};
+      if (!C.stages && location.protocol.indexOf("http") === 0) {
+        window.HostLogin.show(document.body, "QR-коды", "Плакат и наклейки печатает ведущий. Введите ключ ведущего.");
+        return;
+      }
+      const stages = C.stages || [];
+      const el = {
+        error: document.getElementById("error"),
+        base: document.getElementById("base"),
+        print: document.getElementById("print"),
+        stickers: document.getElementById("stickers")
+      };
+      let items = [];
+
+      function fail(text) {
+        el.error.hidden = false;
+        el.error.textContent = text;
+      }
+
+      function renderPoster(base) {
+        const box = document.getElementById("poster-codes");
+        const wifi = C.wifi && C.wifi.ssid ? C.wifi : null;
+        const url = base + "play.html";
+        box.innerHTML = "";
+        const card = document.createElement("div");
+        card.className = "poster__card";
+        card.innerHTML = Join.svg(url) + '<div class="poster__note"></div><div class="poster__step"></div>';
+        card.querySelector(".poster__note").textContent = url;
+        card.querySelector(".poster__step").textContent = wifi
+          ? "Wi-Fi: " + wifi.ssid + (wifi.password ? ", пароль: " + wifi.password : "")
+          : "";
+        box.appendChild(card);
+        document.getElementById("poster").hidden = false;
+      }
+
+      function render() {
+        const base = el.base.value;
+        renderPoster(base);
+        el.stickers.innerHTML = "";
+        items.forEach(function (item) {
+          const n = parseInt(item.folder, 10);
+          const stage = stages[n - 1] || {};
+          const url = base + "q/" + item.code + "/";
+          const qr = qrcode(0, "M");
+          qr.addData(url);
+          qr.make();
+
+          const card = document.createElement("div");
+          card.className = "sticker";
+          card.innerHTML =
+            '<div class="sticker__head"><span class="sticker__num"></span><span class="sticker__tag">ПРОТОКОЛ «ЩИТ»</span></div>' +
+            '<div class="sticker__qr"></div>' +
+            '<div><div class="sticker__name"></div><div class="sticker__hint">Сканируй телефоном — получишь задание</div></div>';
+          card.querySelector(".sticker__num").textContent = "№" + (isNaN(n) ? "?" : n);
+          card.querySelector(".sticker__name").textContent = stage.vulnerability || item.folder;
+          card.querySelector(".sticker__qr").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+          card.title = url;
+          el.stickers.appendChild(card);
+        });
+      }
+
+      el.print.addEventListener("click", function () { window.print(); });
+      el.base.addEventListener("change", render);
+
+      if (window.MatrixBg) window.MatrixBg.setLevel(0);
+
+      if (location.protocol.indexOf("http") !== 0) {
+        fail("Эта страница работает только с сайта на сервере, а не из файла на диске.");
+        return;
+      }
+
+      fetch("api/qr", { cache: "no-store" })
+        .then(function (r) {
+          if (r.status === 403) throw new Error("local");
+          return r.json();
+        })
+        .then(function (data) {
+          items = data.items || [];
+          if (!items.length) {
+            fail("Не найдена папка zadaniya с файлом kody.txt — наклеек для фигурок не будет, но плакат подключения готов.");
+          }
+          const urls = (data.urls && data.urls.length) ? data.urls : [new URL(".", location.href).href];
+          urls.forEach(function (u) {
+            const opt = document.createElement("option");
+            opt.value = u;
+            opt.textContent = u;
+            el.base.appendChild(opt);
+          });
+          render();
+        })
+        .catch(function (e) {
+          if (e.message === "local") {
+            window.HostLogin.show(document.body, "QR-коды", "Плакат и наклейки печатает ведущий. Введите ключ ведущего.");
+            return;
+          }
+          fail("Сервер игры не ответил. Обновите страницу через минуту.");
+        });
+    })();
+  </script>
+</body>
+</html>

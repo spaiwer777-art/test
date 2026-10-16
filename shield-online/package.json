@@ -1,0 +1,12 @@
+{
+  "name": "shield-quest",
+  "version": "1.0.0",
+  "description": "Квест «Протокол Щит» — сервер для хостинга (Node, без зависимостей)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

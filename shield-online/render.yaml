@@ -1,0 +1,11 @@
+# Деплой на Render.com одним кликом (Blueprint).
+services:
+  - type: web
+    name: shield-quest
+    env: node
+    plan: free
+    buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      - key: HOST_KEY
+        sync: false   # задайте свой секрет в настройках Render

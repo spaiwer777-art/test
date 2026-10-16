@@ -1,0 +1,91 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Протокол «Щит» — игрок</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/banner.css">
+</head>
+<body>
+  <canvas id="matrix-bg" class="matrix-bg" aria-hidden="true"></canvas>
+
+  <div class="matrix-banner" id="matrix-banner" hidden>
+    <div class="matrix-banner__title">МАТРИЦА ЗАПУЩЕНА</div>
+    <div class="matrix-banner__sub" id="matrix-banner-sub"></div>
+  </div>
+
+  <div class="play">
+    <div class="brand__title">ПРОТОКОЛ «ЩИТ»</div>
+
+    <!-- Вход в игру -->
+    <form id="join-form" class="play__join" hidden autocomplete="off">
+      <p class="start__lead">Ты подключаешься к игре. Как тебя зовут?</p>
+      <input class="key-input" id="join-name" type="text" maxlength="24" placeholder="Имя и первая буква фамилии" autocapitalize="words">
+      <button class="btn btn--primary btn--big" type="submit">Войти в игру</button>
+      <p class="play__error" id="join-error" hidden></p>
+    </form>
+
+    <!-- Пульт игрока -->
+    <div id="pult" hidden>
+      <div class="play__team">
+        <div class="play__team-name" id="player-name"></div>
+        <button class="play__link" type="button" id="rename">сменить имя</button>
+      </div>
+
+      <div class="panel play__clock">
+        <div class="clock__label">До полного шифрования</div>
+        <div class="play__time" id="time">--:--</div>
+        <div class="play__status" id="status">Ждём начала игры…</div>
+      </div>
+
+      <div class="panel play__matrix" id="matrix-card">
+        <h2 class="panel__title">Матрица</h2>
+        <div class="play__matrix-state" id="matrix-state">—</div>
+        <div class="muted" id="matrix-note"></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel__title">Задания</h2>
+        <p class="muted" id="tasks-empty">Пока нет. Когда капитан отправит тебя в Матрицу, наведи камеру на QR-код фигурки — задание сохранится здесь.</p>
+        <ul class="play__tasks" id="tasks"></ul>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel__title">Мастер-ключ <span class="panel__count" id="done-count"></span></h2>
+        <div class="slots" id="slots"></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel__title">Угрозы</h2>
+        <ul class="play__threats" id="threats"></ul>
+      </div>
+    </div>
+
+    <div class="play__link-state" id="link">Подключение…</div>
+  </div>
+
+  <!-- Таймер Матрицы на телефоне бегуна -->
+  <div class="runner gate gate--ready" id="runner" hidden>
+    <div class="gate__screen">
+      <div class="gate__top">
+        <div class="gate__brand">Матрица</div>
+        <div class="gate__team" id="runner-team"></div>
+      </div>
+      <div class="gate__center">
+        <div class="gate__status" id="runner-status"></div>
+        <div class="gate__time" id="runner-time">01:00</div>
+        <div class="gate__progress"><div class="gate__progress-fill" id="runner-progress"></div></div>
+        <div class="gate__sub" id="runner-sub"></div>
+      </div>
+      <div>
+        <button class="gate__button" type="button" id="runner-button"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/sound.js"></script>
+  <script src="js/matrix-bg.js"></script>
+  <script src="js/play.js"></script>
+</body>
+</html>

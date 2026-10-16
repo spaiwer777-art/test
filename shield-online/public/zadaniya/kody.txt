@@ -1,0 +1,14 @@
+# Коды QR-наклеек: код и папка задания.
+# По коду сервер открывает задание: http://<адрес сервера>/q/<код>/
+# Код можно заменить на любой другой (латинские буквы и цифры) — тогда перепечатайте наклейки.
+8AWV5H 01_trojan
+EEBJ7X 02_wannacry
+J2RGV6 03_morris_worm
+J2WK4T 04_virus
+DAGWSQ 05_spyware
+5FFQWL 06_heartbleed
+Z59P4D 07_phishing
+38KXQD 08_log4shell
+8TRXDW 09_spectre
+BACXJM 10_zeroday
+GJX57Z 11_iloveyou

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Угроза №11 — Червь ILOVEYOU</title>
+<style>
+  @font-face { font-family: "Martian Mono"; src: url("fonts/martian-cyrillic.woff2") format("woff2"); font-weight: 100 800; unicode-range: U+0400-045F, U+2116; }
+  @font-face { font-family: "Martian Mono"; src: url("fonts/martian-latin.woff2") format("woff2"); font-weight: 100 800; unicode-range: U+0000-00FF, U+2000-206F; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("fonts/plex-cyrillic-400.woff2") format("woff2"); font-weight: 400; unicode-range: U+0400-045F, U+2116; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("fonts/plex-cyrillic-600.woff2") format("woff2"); font-weight: 600 700; unicode-range: U+0400-045F, U+2116; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("fonts/plex-latin-400.woff2") format("woff2"); font-weight: 400; unicode-range: U+0000-00FF, U+2000-206F; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("fonts/plex-latin-600.woff2") format("woff2"); font-weight: 600 700; unicode-range: U+0000-00FF, U+2000-206F; }
+  :root {
+    --void: #000400; --code: #00ff41; --dim: #3f9a58; --text: #c9f5d4; --white: #e6ffec;
+    --edge: rgba(0,255,65,.3); --red: #ff2a3d;
+    --glow: 0 0 6px rgba(0,255,65,.65), 0 0 18px rgba(0,255,65,.25);
+    --display: "Martian Mono", Consolas, "Courier New", monospace;
+    --font: "IBM Plex Mono", Consolas, "Courier New", monospace;
+    --mono: var(--font);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--text); font: 18px/1.65 var(--font);
+    background: var(--void);
+    background-image: repeating-linear-gradient(rgba(0,255,65,.035) 0 1px, transparent 1px 3px);
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 32px 22px 64px; }
+  .head { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; }
+  .head img { width: 150px; height: 150px; object-fit: cover; border: 1px solid var(--code); box-shadow: 0 0 20px rgba(0,255,65,.3); }
+  .tag { display: inline-block; color: var(--red); border: 1px solid var(--red); font-weight: 700; font-size: 15px; padding: 2px 10px; text-shadow: 0 0 6px rgba(255,42,61,.7); }
+  .tag::before { content: "[!] "; }
+  h1 { font-family: var(--display); font-size: 34px; font-weight: 800; line-height: 1.15; margin: 10px 0 6px; color: var(--code); text-shadow: var(--glow); }
+  .en { color: var(--dim); font-size: 15px; }
+  h2 { font-family: var(--display); font-size: 20px; font-weight: 800; margin: 34px 0 10px; color: var(--white); text-shadow: var(--glow); }
+  h2::before { content: "> "; color: var(--dim); text-shadow: none; }
+  p { margin: 0 0 14px; max-width: 72ch; }
+  .story { border-left: 2px solid var(--code); padding: 2px 0 2px 16px; }
+  .sheet {
+    background: rgba(0,14,5,.9); color: var(--white); border: 1px solid var(--edge); padding: 20px 22px; margin: 18px 0;
+    box-shadow: inset 0 0 30px rgba(0,255,65,.05);
+  }
+  .sheet p:last-child { margin-bottom: 0; }
+  .sheet table { border-collapse: collapse; width: 100%; }
+  .sheet th, .sheet td { border: 1px solid rgba(0,255,65,.22); padding: 8px 12px; text-align: left; vertical-align: top; }
+  .sheet th { color: var(--dim); font-weight: 600; font-size: 15px; }
+  .mark { font-family: var(--display); color: var(--code); font-weight: 800; text-align: center !important; width: 80px; text-shadow: var(--glow); }
+  .num { font-family: var(--display); font-weight: 700; text-align: center !important; width: 60px; color: var(--dim); }
+  .note { border: 1px dashed var(--edge); padding: 14px 18px; margin: 18px 0; }
+  .note b, .story b, .sheet b { color: var(--code); text-shadow: var(--glow); }
+  .big { font-family: var(--display); font-weight: 800; font-size: 32px; letter-spacing: .08em; word-break: break-all; line-height: 1.4; color: var(--code); text-shadow: var(--glow); }
+  .code { font-family: var(--font); font-size: 16px; }
+  .chain { word-break: normal; } .chain span { display: inline-block; white-space: nowrap; }
+  .poem p { margin: 0; }
+  .alpha { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .alpha span { width: 46px; height: 52px; border: 1px solid rgba(0,255,65,.3); display: grid; place-items: center; font-family: var(--display); font-weight: 700; line-height: 1.05; text-align: center; color: var(--code); }
+  .alpha small { display: block; font-family: var(--font); font-weight: 600; font-size: 12px; color: var(--dim); }
+  .pult-link { display: inline-block; margin-top: 8px; padding: 12px 16px; border: 1px solid var(--edge); color: var(--code); text-decoration: none; font-weight: 600; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px dashed var(--edge); color: var(--code); font-weight: 600; text-shadow: var(--glow); }
+  @media (max-width: 600px) {
+    .wrap { padding: 20px 12px 48px; }
+    .head { grid-template-columns: 1fr; } h1 { font-size: 26px; } .big { font-size: 22px; }
+    .sheet { padding: 14px 12px; }
+    .sheet th, .sheet td { padding: 6px 7px; }
+    .wire { min-width: 48px !important; }
+    .alpha span { width: 38px; height: 46px; }
+  }
+  @media print {
+    body { background: #fff; color: #000; }
+    h1, h2, .tag, .en, .mark, .num, .big, .footer, .alpha span, .alpha small, .note b, .story b, .sheet b, .sheet th { color: #000 !important; text-shadow: none !important; }
+    .sheet { background: #fff; color: #000; box-shadow: none; border-color: #000; }
+    .sheet th, .sheet td, .alpha span, .note, .story, .tag, .footer { border-color: #000 !important; }
+    .head img { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <img src="figura.jpg" alt="">
+    <div>
+      <span class="tag">Угроза №11</span>
+      <h1>Червь ILOVEYOU</h1>
+      <div class="en">ILOVEYOU, Love Bug, 2000</div>
+    </div>
+  </div>
+
+  <h2>Досье</h2>
+  <div class="story">
+    <p>В мае 2000 года миллионы людей получили письмо с темой «I LOVE YOU» («Я тебя люблю»).
+    Внутри было «любовное письмо». Люди открывали его — и червь рассылал себя всем их друзьям
+    и портил файлы. За несколько дней он заразил миллионы компьютеров по всему миру.</p>
+    <p class="code">Тема: ILOVEYOU<br>Текст: kindly check the attached LOVELETTER coming from me.<br>Файл: LOVE-LETTER-FOR-YOU.TXT.vbs</p>
+    <p>Файл только притворялся текстом (.TXT). Настоящее расширение — <b>.vbs</b>, это программа!</p>
+  </div>
+
+  <h2>Задание</h2>
+  <p>Письмо ILOVEYOU добралось до нашего школьного сервера. Каждый, кто открыл вложение,
+  тут же разослал письмо дальше. Вот журнал почтового сервера:</p>
+  <div class="sheet">
+    <table>
+      <tr><th>Время</th><th>Кто отправил</th><th>Кому</th></tr>
+      <tr><td class="code">09:00</td><td>love@lover.net</td><td>Вика</td></tr>
+      <tr><td class="code">09:05</td><td>Вика</td><td>Дима</td></tr>
+      <tr><td class="code">09:06</td><td>Вика</td><td>Лёша</td></tr>
+      <tr><td class="code">09:12</td><td>Дима</td><td>Катя</td></tr>
+      <tr><td class="code">09:14</td><td>Лёша</td><td>Рома</td></tr>
+      <tr><td class="code">09:15</td><td>Лёша</td><td>Оля</td></tr>
+      <tr><td class="code">09:20</td><td>Катя</td><td>Тимур</td></tr>
+      <tr><td class="code">09:21</td><td>Оля</td><td>Женя</td></tr>
+      <tr><td class="code">09:22</td><td>Рома</td><td>Сева</td></tr>
+      <tr><td class="code">09:30</td><td>Женя</td><td>Егор</td></tr>
+      <tr><td class="code">09:31</td><td>Оля</td><td>Света</td></tr>
+      <tr><td class="code">09:33</td><td>Тимур</td><td>Фёдор</td></tr>
+      <tr><td class="code">09:40</td><td>Егор</td><td>Настя</td></tr>
+      <tr><td class="code">09:41</td><td>Женя</td><td>Юля</td></tr>
+      <tr><td class="code">09:45</td><td>Света</td><td>Гоша</td></tr>
+      <tr><td class="code">09:50</td><td>Настя</td><td>Илья</td></tr>
+      <tr><td class="code">09:52</td><td>Настя</td><td>Петя</td></tr>
+      <tr><td class="code">09:58</td><td>Илья</td><td>Ева</td></tr>
+      <tr><td class="code">10:00</td><td>Юля</td><td>Борис</td></tr>
+      <tr><td class="code">10:05</td><td>Ева</td><td><b>сервер SRV-SCHOOL-01</b></td></tr>
+      <tr><td class="code">10:06</td><td>Ева</td><td>Маша</td></tr>
+    </table>
+  </div>
+  <p class="note">Найди путь, по которому червь дошёл до нашего сервера: от того, кто получил письмо прямо от хакера,
+  до нас. Выпиши <b>первые буквы имён</b> на этом пути по порядку — получится ключ:
+  то, что нельзя открывать в письмах от незнакомцев.</p>
+
+  <p class="footer">Решайте вместе. Ключ вводит капитан на терминале защиты.</p>
+  <p><a class="pult-link" id="to-pult" href="../../play.html" hidden>← Мой пульт</a></p>
+</div>
+<script>
+  // Задание открыто по QR с фигурки: запоминаем его для пульта агента на этом телефоне.
+  (function () {
+    if (location.protocol.indexOf("http") !== 0) return;
+    try {
+      var key = "shield-quest:my-tasks";
+      var list = JSON.parse(localStorage.getItem(key) || "[]");
+      var path = location.pathname;
+      if (!list.some(function (t) { return t.path === path; })) {
+        list.push({ path: path, title: document.title, num: 11 });
+        localStorage.setItem(key, JSON.stringify(list));
+      }
+    } catch (e) { /* без сохранения задание всё равно открыто */ }
+    document.getElementById("to-pult").hidden = false;
+  })();
+</script>
+</body>
+</html>

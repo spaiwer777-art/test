@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Матрица — таймер доступа</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="gate gate--ready" id="gate">
+  <canvas id="matrix-bg" class="matrix-bg" aria-hidden="true"></canvas>
+
+  <div class="gate__screen">
+    <div class="gate__top">
+      <div class="gate__brand">Шлюз Матрицы</div>
+      <div class="gate__tools">
+        <button class="btn" type="button" id="btn-fullscreen">На весь экран</button>
+        <button class="btn" type="button" id="btn-open">Открыть сейчас</button>
+        <button class="btn btn--danger" type="button" id="btn-reset">Обнулить</button>
+      </div>
+    </div>
+
+    <div class="gate__center">
+      <div class="gate__status" id="status">Матрица открыта</div>
+      <div class="gate__time" id="time">01:00</div>
+      <div class="gate__progress"><div class="gate__progress-fill" id="progress"></div></div>
+      <div class="gate__sub" id="sub"></div>
+      <div class="gate__violation" id="violation"></div>
+    </div>
+
+    <div>
+      <button class="gate__button" type="button" id="main-button">Войти</button>
+      <div class="gate__stats" id="stats"></div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/matrix-bg.js"></script>
+  <script src="js/timer.js"></script>
+</body>
+</html>

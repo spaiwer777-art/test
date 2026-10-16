@@ -1,0 +1,37 @@
+/* Баннер «МАТРИЦА ЗАПУЩЕНА» — показывается на терминале и на телефонах всех участников, пока идёт заход. */
+.matrix-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 14px 16px;
+  text-align: center;
+  background: #001a06;
+  color: var(--code);
+  border-bottom: 2px solid var(--code);
+  box-shadow: 0 0 30px rgba(0, 255, 65, 0.35);
+  pointer-events: none;
+}
+.matrix-banner[hidden] { display: none; }
+.matrix-banner__title {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(22px, 4vw, 44px);
+  letter-spacing: 0.04em;
+  text-shadow: var(--glow);
+  animation: blink 1.4s steps(2, start) infinite;
+}
+.matrix-banner__sub {
+  margin-top: 4px;
+  font-size: clamp(14px, 2vw, 22px);
+  color: var(--text);
+  text-shadow: none;
+}
+.matrix-banner--warn {
+  background: #1c0004;
+  color: var(--red);
+  border-bottom-color: var(--red);
+  box-shadow: 0 0 30px rgba(255, 0, 40, 0.4);
+}
+.matrix-banner--warn .matrix-banner__title { text-shadow: var(--glow-red); animation: blink 0.6s steps(2, start) infinite; }

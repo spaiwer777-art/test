@@ -1,0 +1,46 @@
+# Протокол «Щит» — настройка для обычного хостинга (Apache + PHP).
+# API игры, config.js с ответами и задания по QR обслуживает папка backend.
+
+DirectoryIndex start.html index.html
+AddDefaultCharset utf-8
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # API игры
+  RewriteRule ^api/(.*)$ backend/index.php?route=$1 [QSA,L]
+
+  # config.js с ответами — только ведущему (проверка ключа в backend/config.php)
+  RewriteRule ^js/+config\.js$ backend/config.php [NC,L]
+
+  # Задания по QR-кодам фигурок
+  RewriteRule ^q/([A-Za-z0-9]+)$ q/$1/ [R=302,L]
+  RewriteRule ^q/([A-Za-z0-9]+)/(.*)$ backend/task.php?code=$1&file=$2 [QSA,L]
+
+  # Прямой доступ к папке заданий закрыт — только по коду с наклейки
+  RewriteRule ^zadaniya(/|$) - [F,L]
+  # Служебные файлы бэкенда
+  RewriteRule ^backend/(common|key)\.php$ - [F,L]
+  RewriteRule ^backend/data(/|$) - [F,L]
+</IfModule>
+
+# Если на хостинге выключен mod_rewrite, игра работать не будет —
+# но и config.js с ответами не утечёт.
+<IfModule !mod_rewrite.c>
+  <Files "config.js">
+    <IfModule mod_authz_core.c>
+      Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+      Order allow,deny
+      Deny from all
+    </IfModule>
+  </Files>
+</IfModule>
+
+# Задания открываются на телефонах — без кеша, чтобы сразу видеть правки
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|js|css)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

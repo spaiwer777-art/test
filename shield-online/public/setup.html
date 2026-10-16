@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Протокол «Щит» — конструктор игры</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .setup { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .setup__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin: 18px 0; }
+    .setup__card { display: flex; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--edge); cursor: pointer; background: rgba(0, 255, 65, 0.03); }
+    .setup__card--on { border-color: var(--code); background: rgba(0, 255, 65, 0.12); }
+    .setup__card img { width: 64px; height: 64px; object-fit: cover; flex: none; }
+    .setup__card input { flex: none; width: 18px; height: 18px; }
+    .setup__name { font-weight: 600; }
+    .setup__num { font-family: var(--display); color: var(--dim); font-size: 13px; }
+    .setup__bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .setup__msg { margin-top: 14px; color: var(--dim); min-height: 1.4em; }
+    .setup__msg--warn { color: var(--red); }
+    .setup__settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 18px 0; }
+    .setup__settings .field__label { display: block; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <canvas id="matrix-bg" class="matrix-bg" aria-hidden="true"></canvas>
+  <div class="setup">
+    <div class="brand__title">КОНСТРУКТОР ИГРЫ</div>
+    <p class="start__lead">Отметьте фигурки, которые будут в этой игре. Остальные не появятся ни на терминале, ни в плакате QR-кодов.</p>
+
+    <div class="setup__bar">
+      <button class="btn" type="button" id="all">Выбрать все</button>
+      <button class="btn" type="button" id="none">Снять все</button>
+      <span class="muted" id="count"></span>
+    </div>
+
+    <h2 class="panel__title">Настройки игры</h2>
+    <form class="setup__settings" id="settings" onsubmit="return false"></form>
+
+    <h2 class="panel__title">Угрозы</h2>
+    <div class="setup__grid" id="list"></div>
+
+    <div class="setup__bar">
+      <button class="btn btn--primary" type="button" id="save">Сохранить</button>
+      <button class="btn btn--primary" type="button" id="save-open">Сохранить и открыть терминал</button>
+      <a class="btn" href="start.html">На старт</a>
+    </div>
+    <div class="setup__msg" id="msg"></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/matrix-bg.js"></script>
+  <script src="js/host-login.js"></script>
+  <script>
+    (function () {
+      const C = window.QUEST_CONFIG || {};
+      const stages = C.stages || [];
+      const list = document.getElementById("list");
+      const msg = document.getElementById("msg");
+      const count = document.getElementById("count");
+      if (!stages.length) {
+        window.HostLogin.show(document.body, "Конструктор игры", "Конструктор доступен только ведущему. Введите ключ ведущего.");
+        return;
+      }
+      const boxes = [];
+      stages.forEach(function (s, i) {
+        const label = document.createElement("label");
+        label.className = "setup__card";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.checked = true;
+        input.addEventListener("change", update);
+        const img = document.createElement("img");
+        img.src = s.image;
+        img.alt = "";
+        const text = document.createElement("div");
+        const num = document.createElement("div");
+        num.className = "setup__num";
+        num.textContent = "Фигурка " + (i + 1);
+        const name = document.createElement("div");
+        name.className = "setup__name";
+        name.textContent = s.vulnerability;
+        text.appendChild(num);
+        text.appendChild(name);
+        label.appendChild(input);
+        label.appendChild(img);
+        label.appendChild(text);
+        list.appendChild(label);
+        boxes.push({ input: input, label: label, num: i + 1 });
+      });
+
+      function chosen() {
+        return boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.num; });
+      }
+
+      function update() {
+        const ids = chosen();
+        boxes.forEach(function (b) { b.label.classList.toggle("setup__card--on", b.input.checked); });
+        count.textContent = "Выбрано: " + ids.length + " из " + boxes.length;
+        if (ids.length === 0) {
+          msg.className = "setup__msg setup__msg--warn";
+          msg.textContent = "Выберите хотя бы одну фигурку.";
+        } else if (ids.length < boxes.length) {
+          msg.className = "setup__msg";
+          msg.textContent = "Часть угроз не выбрана: мастер-ключ соберётся из букв выбранных угроз по порядку.";
+        } else {
+          msg.className = "setup__msg";
+          msg.textContent = "Играют все угрозы. Мастер-ключ: " + (C.finalKey ? C.finalKey.word : "");
+        }
+      }
+
+      const FIELDS = [
+        ["teamName", "Название команды", "text"],
+        ["totalMinutes", "Время игры, мин", 5, 180],
+        ["insideSeconds", "Время в Матрице, сек", 10, 300],
+        ["warnSeconds", "Предупреждение до конца, сек", 3, 30],
+        ["cooldownSeconds", "Перезарядка Матрицы, сек", 30, 900],
+        ["runnersPerVisit", "Агентов за заход", 1, 10],
+        ["autoPenaltySeconds", "Штраф за опоздание, сек", 0, 600],
+        ["wrongPenaltySeconds", "Штраф за неверный ключ, сек", 0, 600],
+        ["maxWrongBeforeLock", "Ошибок подряд до блокировки", 1, 10],
+        ["lockSeconds", "Длительность блокировки, сек", 5, 300],
+        ["hintPenaltySeconds", "Штраф за подсказку, сек", 0, 900]
+      ];
+      const inputs = {};
+      const form = document.getElementById("settings");
+      FIELDS.forEach(function (f) {
+        const row = document.createElement("label");
+        row.className = "field";
+        const lab = document.createElement("span");
+        lab.className = "field__label";
+        lab.textContent = f[1];
+        const inp = document.createElement("input");
+        inp.className = "key-input";
+        if (f[2] === "text") { inp.type = "text"; inp.maxLength = 40; }
+        else { inp.type = "number"; inp.min = f[2]; inp.max = f[3]; }
+        inputs[f[0]] = inp;
+        row.appendChild(lab);
+        row.appendChild(inp);
+        form.appendChild(row);
+      });
+      function readSettings() {
+        const out = {};
+        FIELDS.forEach(function (f) { out[f[0]] = f[2] === "text" ? inputs[f[0]].value : Number(inputs[f[0]].value); });
+        return out;
+      }
+      function fillSettings(s) {
+        if (!s) return;
+        FIELDS.forEach(function (f) { inputs[f[0]].value = s[f[0]]; });
+      }
+      // Значения по умолчанию из config.js, пока сервер не ответил.
+      fillSettings({
+        teamName: C.teamName, totalMinutes: C.totalMinutes,
+        insideSeconds: C.matrix.insideSeconds, cooldownSeconds: C.matrix.cooldownSeconds,
+        warnSeconds: C.matrix.warnSeconds, runnersPerVisit: C.matrix.runnersPerVisit,
+        autoPenaltySeconds: C.matrix.autoPenaltySeconds, wrongPenaltySeconds: C.wrongPenaltySeconds,
+        maxWrongBeforeLock: C.maxWrongBeforeLock, lockSeconds: C.lockSeconds, hintPenaltySeconds: C.hintPenaltySeconds
+      });
+
+      function save(then) {
+        const ids = chosen();
+        if (ids.length === 0) { update(); return; }
+        fetch("api/setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stages: ids, settings: readSettings() })
+        }).then(function (r) {
+          if (!r.ok) throw new Error("bad");
+          msg.className = "setup__msg";
+          msg.textContent = "Сохранено. Новая игра стартует с этим составом.";
+          if (then) location.href = "index.html";
+        }).catch(function () {
+          msg.className = "setup__msg setup__msg--warn";
+          msg.textContent = "Не удалось сохранить: сервер не отвечает.";
+        });
+      }
+
+      function load() {
+        fetch("api/setup", { cache: "no-store" })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            boxes.forEach(function (b) { b.input.checked = data.stages.indexOf(b.num) !== -1; });
+            fillSettings(data.settings);
+            update();
+          })
+          .catch(update);
+      }
+
+      document.getElementById("all").addEventListener("click", function () {
+        boxes.forEach(function (b) { b.input.checked = true; }); update();
+      });
+      document.getElementById("none").addEventListener("click", function () {
+        boxes.forEach(function (b) { b.input.checked = false; }); update();
+      });
+      document.getElementById("save").addEventListener("click", function () { save(false); });
+      document.getElementById("save-open").addEventListener("click", function () { save(true); });
+      load();
+    })();
+  </script>
+</body>
+</html>

