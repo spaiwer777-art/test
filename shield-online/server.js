@@ -670,6 +670,15 @@ function shutdown() { flushGame(); process.exit(0); }
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
+server.on("error", function (e) {
+  if (e && e.code === "EADDRINUSE") {
+    console.error("");
+    console.error("  Порт " + PORT + " уже занят: наверное, сервер уже запущен в другом окне.");
+    process.exit(2); // ЗАПУСК.bat по этому коду не перезапускает сервер по кругу
+  }
+  throw e;
+});
+
 server.listen(PORT, function () {
   console.log("");
   console.log("  ПРОТОКОЛ «ЩИТ» — сервер для хостинга запущен");

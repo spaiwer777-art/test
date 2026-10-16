@@ -1,0 +1,2 @@
+# Командные файлы Windows — только с CRLF, иначе cmd путается в метках goto.
+*.bat text eol=crlf

@@ -1,4 +1,6 @@
 node_modules/
 setup.json
 game.json
+host-key.txt
+host-key.tmp
 public/backend/data/state.json
