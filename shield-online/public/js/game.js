@@ -112,6 +112,12 @@
     taskTitle: $("task-title"),
     taskWhere: $("task-where"),
     taskText: $("task-text"),
+    taskTextRow: $("task-text-row"),
+    taskFrame: $("task-frame"),
+    taskFull: $("task-full"),
+    taskOverlay: $("task-overlay"),
+    taskOverlayFrame: $("task-overlay-frame"),
+    taskOverlayClose: $("task-overlay-close"),
     taskFormat: $("task-format"),
     taskHint: $("task-hint"),
     taskHintBtn: $("task-hint-btn"),
@@ -571,12 +577,20 @@
     const i = selected;
     const s = STAGES[i];
     const done = isDone(i);
-    el.taskImg.hidden = !s.image;
+    // Полное задание фигурки (как по QR-наклейке) вместо короткого описания.
+    // Картинка и номер фигурки есть в самом задании — в шапке карточки их не повторяем.
+    const url = taskUrls[numOf(s)] || "";
+    el.taskImg.hidden = !s.image || !!url;
+    el.taskWhere.hidden = !!url;
     if (s.image) el.taskImg.src = s.image;
-    el.taskLabel.textContent = "Угроза №" + (i + 1) + (done ? ", обезврежена" : ", активна");
+    el.taskLabel.textContent = "Угроза №" + numOf(s) + (done ? ", обезврежена" : ", активна");
     el.taskTitle.textContent = s.vulnerability;
-    el.taskWhere.textContent = "Задание — по QR-коду на фигурке №" + (i + 1) + " " + (s.figure || "") + ".";
+    el.taskWhere.textContent = "Задание — по QR-коду на фигурке №" + numOf(s) + " " + (s.figure || "") + ".";
     el.taskText.textContent = s.task || "Отсканируйте QR-код на фигурке и следуйте инструкции.";
+    el.taskTextRow.hidden = !!url;
+    el.taskFrame.hidden = !url;
+    el.taskFull.hidden = !url;
+    if (url && el.taskFrame.getAttribute("src") !== url) el.taskFrame.setAttribute("src", url);
     el.taskFormat.textContent = s.answerFormat || "слово или число";
 
     if (done) {
@@ -596,6 +610,37 @@
     el.taskHintBtn.textContent = confirming ? "Точно? Нажмите ещё раз" + cost : "Подсказка" + cost;
     el.taskHintBtn.classList.toggle("btn--confirm", confirming);
     el.taskHintBtn.disabled = state.status !== "running";
+  }
+
+  // Полные задания фигурок: номер фигурки -> адрес /q/<код>/ (коды из zadaniya/kody.txt).
+  let taskUrls = {};
+  function loadTaskUrls() {
+    fetch("api/qr", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || !data.items) return;
+        const urls = {};
+        data.items.forEach(function (it) {
+          const m = String(it.folder).match(/^(\d+)/);
+          if (m) urls[parseInt(m[1], 10)] = "q/" + it.code + "/";
+        });
+        taskUrls = urls;
+        if (selected !== null) renderMission();
+      })
+      .catch(function () { /* без сервера — только короткое описание задания */ });
+  }
+
+  function openTaskFull() {
+    const url = el.taskFrame.getAttribute("src");
+    if (!url) return;
+    if (el.taskOverlayFrame.getAttribute("src") !== url) el.taskOverlayFrame.setAttribute("src", url);
+    el.taskOverlay.hidden = false;
+    el.taskOverlayClose.focus();
+  }
+
+  function closeTaskFull() {
+    el.taskOverlay.hidden = true;
+    if (state.status === "running") el.input.focus();
   }
 
   function renderMission() {
@@ -899,6 +944,7 @@
         moved = true;
         closeAdmin();
         closeJoin();
+        closeTaskFull();
         if (document.activeElement) document.activeElement.blur();
         window.Terminal.stopped();
       });
@@ -1168,6 +1214,9 @@
   el.joinClose.addEventListener("click", closeJoin);
   el.join.addEventListener("click", function (e) { if (e.target === el.join) closeJoin(); });
   el.taskBack.addEventListener("click", function () { selectThreat(null); });
+  el.taskFull.addEventListener("click", openTaskFull);
+  el.taskOverlayClose.addEventListener("click", closeTaskFull);
+  el.taskOverlay.addEventListener("click", function (e) { if (e.target === el.taskOverlay) closeTaskFull(); });
 
   el.adminLogin.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -1194,6 +1243,8 @@
       closeAdmin();
     } else if (e.key === "Escape" && !el.join.hidden) {
       closeJoin();
+    } else if (e.key === "Escape" && !el.taskOverlay.hidden) {
+      closeTaskFull();
     }
   });
 
@@ -1227,6 +1278,7 @@
   setInterval(tick, 250);
   if (ONLINE) {
     Join.lanBase().then(function (base) { if (base) renderJoin(base); });
+    loadTaskUrls();
     syncLan();
     setInterval(syncLan, 1000);
   }

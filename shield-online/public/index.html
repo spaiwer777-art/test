@@ -71,10 +71,12 @@
               <div class="task__where" id="task-where"></div>
             </div>
           </div>
-          <div class="task__row">
+          <div class="task__row" id="task-text-row">
             <div class="task__key">Что сделать</div>
             <div class="task__value" id="task-text"></div>
           </div>
+          <!-- Полное задание фигурки — та же страница, что открывается по QR-наклейке -->
+          <iframe class="task__frame" id="task-frame" title="Задание фигурки" hidden></iframe>
           <div class="task__row">
             <div class="task__key">Ответ</div>
             <div class="task__value" id="task-format"></div>
@@ -82,6 +84,7 @@
           <div class="task__hint" id="task-hint" hidden></div>
           <div class="task__actions">
             <button class="btn" type="button" id="task-hint-btn">Подсказка</button>
+            <button class="btn" type="button" id="task-full" hidden>Задание на весь экран</button>
             <button class="btn" type="button" id="task-back">Все угрозы</button>
           </div>
         </div>
@@ -169,6 +172,14 @@
         </div>
       </div>
       <button class="btn" type="button" id="join-close">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- Задание фигурки на весь экран -->
+  <div class="overlay overlay--task" id="task-overlay" hidden>
+    <div class="modal modal--task">
+      <iframe class="task__frame task__frame--full" id="task-overlay-frame" title="Задание фигурки"></iframe>
+      <button class="btn" type="button" id="task-overlay-close">Закрыть</button>
     </div>
   </div>
 

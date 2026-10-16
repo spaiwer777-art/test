@@ -133,7 +133,8 @@
 <script>
   // Задание открыто по QR с фигурки: запоминаем его для пульта агента на этом телефоне.
   (function () {
-    if (location.protocol.indexOf("http") !== 0) return;
+    // Открыто внутри терминала ведущего — это не телефон агента, ничего не запоминаем.
+    if (location.protocol.indexOf("http") !== 0 || window.top !== window) return;
     try {
       var key = "shield-quest:my-tasks";
       var list = JSON.parse(localStorage.getItem(key) || "[]");
