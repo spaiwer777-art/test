@@ -15,7 +15,7 @@
     <div class="start__grid">
       <a class="start__card" href="index.html">
         <div class="start__name">Терминал защиты</div>
-        <div class="start__desc">Главный экран игры на компьютере или проекторе ведущего. Нужен ключ ведущего.</div>
+        <div class="start__desc">Главный экран игры на компьютере или проекторе ведущего. Открывается на любом компьютере, его можно перенести на другой посреди игры. Нужен ключ ведущего.</div>
       </a>
       <a class="start__card" href="timer.html">
         <div class="start__name">Запасной таймер</div>
@@ -45,6 +45,7 @@
   <script src="js/config.js"></script>
   <script src="js/matrix-bg.js"></script>
   <script src="js/host-login.js"></script>
+  <script src="js/terminal.js"></script>
   <script>
     window.MatrixBg.setLevel(0.12);
     // Ведущий вошёл в этом браузере — показываем, как выйти (важно на общем компьютере).
@@ -58,6 +59,29 @@
       out.addEventListener("click", function (e) { e.preventDefault(); window.HostLogin.logout(); });
       bar.appendChild(out);
       document.querySelector(".start").appendChild(bar);
+
+      // Где сейчас главный экран — сервер может стоять в другой комнате, а терминал на любом ПК.
+      if (location.protocol.indexOf("http") === 0) {
+        fetch("api/terminal", { cache: "no-store" })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (info) {
+            if (!info) return;
+            const line = document.createElement("p");
+            line.className = "muted terminal-status";
+            if (info.owner && info.ownerOnline) {
+              line.textContent = info.owner === window.Terminal.id()
+                ? "Главный экран открыт в этом браузере."
+                : "Главный экран сейчас открыт " + window.Terminal.where(info) +
+                  ". Откройте «Терминал защиты» здесь, чтобы перенести его на этот компьютер.";
+            } else {
+              line.textContent = info.game
+                ? "Главный экран сейчас нигде не открыт. Игра сохранена на сервере — «Терминал защиты» продолжит её на этом компьютере."
+                : "Главный экран сейчас нигде не открыт.";
+            }
+            bar.parentNode.insertBefore(line, bar);
+          })
+          .catch(function () { /* старый сервер без api/terminal */ });
+      }
     }
     // Название «расшифровывается» при открытии страницы.
     (function () {

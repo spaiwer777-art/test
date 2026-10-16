@@ -8,6 +8,10 @@
       "Терминал с ответами открывает только ведущий. Введите ключ ведущего — его задают при размещении сайта.");
     return;
   }
+  // Главный экран можно открыть на любом компьютере, но он один (см. terminal.js).
+  // Если терминал уже работает на другом компьютере, здесь показан вопрос о переносе.
+  const TERMINAL = window.Terminal ? window.Terminal.start() : { mode: "local", game: null };
+  if (TERMINAL.mode === "busy") return;
   const STORAGE_KEY = "shield-quest:state-v2";
   // Настройки из конструктора (setup.json) заменяют значения из config.js до старта игры.
   applySettings(loadSettings());
@@ -152,6 +156,9 @@
   };
 
   let state = load();
+  if (TERMINAL.mode === "main") save();
+  // Главный экран перенесли на другой компьютер — здесь игра остановлена.
+  let moved = false;
   let feedback = { text: "", kind: "" };
   let lockWasActive = false;
   // Угроза, открытая в карточке (только на этом экране, не сохраняется).
@@ -193,6 +200,12 @@
   }
 
   function load() {
+    // Игра, сохранённая на сервере (например, начатая на другом компьютере), важнее локальной.
+    if (TERMINAL.game) {
+      const game = TERMINAL.game;
+      TERMINAL.game = null;
+      return Object.assign(defaultState(), game);
+    }
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (saved && typeof saved === "object") return Object.assign(defaultState(), saved);
@@ -386,6 +399,7 @@
 
   function onSubmit(e) {
     e.preventDefault();
+    if (moved) return;
     Sfx.unlock();
     if (state.status !== "running" || isLocked()) return;
 
@@ -743,6 +757,7 @@
   // ---------- таймер ----------
 
   function tick() {
+    if (moved) return;
     if (state.status === "running") {
       const rem = remaining();
       ALERT_MINUTES.forEach(function (m) {
@@ -875,8 +890,18 @@
   }
 
   function syncLan() {
-    if (syncBusy) return;
+    if (syncBusy || moved) return;
     syncBusy = true;
+    // Полное состояние игры — на сервер: с ним терминал можно открыть на другом компьютере.
+    const terminalReq = TERMINAL.mode !== "main" ? Promise.resolve() : window.Terminal.push(state)
+      .then(function (result) {
+        if (result !== "moved") return;
+        moved = true;
+        closeAdmin();
+        closeJoin();
+        if (document.activeElement) document.activeElement.blur();
+        window.Terminal.stopped();
+      });
     const stateReq = fetch("api/state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -919,7 +944,7 @@
       })
       .catch(function () { /* сервер недоступен — попробуем в следующий раз */ });
 
-    Promise.all([gateReq, eventsReq, stateReq]).then(function () {
+    Promise.all([gateReq, eventsReq, stateReq, terminalReq]).then(function () {
       syncBusy = false;
       renderGate();
     });
@@ -980,6 +1005,7 @@
   // ---------- панель организатора ----------
 
   function openAdmin() {
+    if (moved) return;
     el.admin.hidden = false;
     el.adminControls.hidden = true;
     el.adminLogin.hidden = false;

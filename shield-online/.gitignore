@@ -1,3 +1,4 @@
 node_modules/
 setup.json
+game.json
 public/backend/data/state.json

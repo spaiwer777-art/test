@@ -869,3 +869,8 @@ body.no-scan::after { display: none; }
 .host-login__msg { min-height: 1.4em; color: var(--dim); }
 .host-login__msg--bad { color: var(--red); }
 .host-login__status { margin-top: 24px; }
+
+/* Главный экран на другом компьютере (js/terminal.js) */
+.overlay--moved { z-index: 300; }
+.terminal-move__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.terminal-status { margin-top: 18px; }

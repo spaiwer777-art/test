@@ -18,6 +18,10 @@
 //   PORT        — порт (хостинг обычно задаёт сам; по умолчанию 8080)
 //   HOST_KEY    — секретный ключ ведущего (ЗАДАЙТЕ его на хостинге!)
 //   PUBLIC_URL  — публичный адрес сайта для QR (необязательно; по умолчанию берётся из браузера)
+//
+// Главный экран (терминал защиты) можно открыть на ЛЮБОМ компьютере: состояние игры хранится
+// на сервере (game.json), поэтому сервер может стоять в каморке, а терминал — на ПК у проектора.
+// Главный экран у игры один; открыв терминал на другом компьютере, его можно перенести туда.
 
 "use strict";
 
@@ -25,12 +29,14 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const os = require("os");
 
 const ROOT = __dirname;
 const SITE = path.join(ROOT, "public");           // сайт
 const QUEST_DIR = path.join(SITE, "zadaniya");    // задания по QR фигурок (отдаются только по коду)
 const BACKEND_DIR = path.join(SITE, "backend");   // PHP-бэкенд для обычного хостинга (Node его не отдаёт)
 const SETUP_FILE = path.join(ROOT, "setup.json"); // вне public — не скачать из браузера
+const GAME_FILE = path.join(ROOT, "game.json");   // состояние главного экрана (тоже вне public)
 const CONFIG_FILE = path.join(SITE, "js", "config.js");
 const CODES_FILE = path.join(QUEST_DIR, "kody.txt");
 
@@ -110,6 +116,73 @@ function saveSetup() {
 }
 
 function nowMs() { return Date.now(); }
+
+// ---------- главный экран (терминал защиты) ----------
+// Полное состояние игры присылает тот терминал, который сейчас главный (owner).
+// Другой компьютер ведущего может забрать главный экран себе (/api/terminal/claim) —
+// тогда прежний получает отказ на сохранение и показывает заставку «экран перенесён».
+const TERMINAL_ONLINE_MS = 15000;
+let terminal = { owner: "", addr: "", seen: 0, game: "null", clientNow: 0, savedAt: 0 };
+try {
+  const g = JSON.parse(fs.readFileSync(GAME_FILE, "utf8"));
+  if (g && g.game && typeof g.game === "object") {
+    terminal.game = JSON.stringify(g.game);
+    terminal.clientNow = Number(g.clientNow) || 0;
+    terminal.savedAt = Number(g.savedAt) || 0;
+  }
+} catch (e) { /* файла ещё нет — новой игры */ }
+
+let gameDirty = false;
+function flushGame() {
+  if (!gameDirty) return;
+  gameDirty = false;
+  const data = '{"savedAt":' + terminal.savedAt + ',"clientNow":' + terminal.clientNow + ',"game":' + terminal.game + "}";
+  try { fs.writeFileSync(GAME_FILE, data); } catch (e) { /* нет прав на запись — игра идёт из памяти */ }
+}
+setInterval(flushGame, 3000).unref();
+
+function validTerminalId(v) { return /^[a-z0-9]{8,32}$/.test(String(v || "")); }
+
+function terminalInfo() {
+  const now = nowMs();
+  const t = terminal;
+  return '{"owner":' + JSON.stringify(t.owner) +
+    ',"addr":' + JSON.stringify(t.addr) +
+    ',"ownerOnline":' + (t.owner !== "" && t.seen > 0 && now - t.seen < TERMINAL_ONLINE_MS) +
+    ',"ownerAgoMs":' + (t.seen ? now - t.seen : -1) +
+    ',"ageMs":' + (t.savedAt ? now - t.savedAt : -1) +
+    ',"clientNow":' + t.clientNow +
+    ',"game":' + t.game + "}";
+}
+
+function clientAddr(req) {
+  const fwd = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  const a = fwd || (req.socket && req.socket.remoteAddress) || "";
+  return a.replace(/^::ffff:/, "");
+}
+
+// Адреса этого компьютера в локальной сети — их видно в консоли и в QR,
+// если терминал открыт прямо на сервере через localhost.
+function lanUrls() {
+  const list = [];
+  const nets = os.networkInterfaces();
+  Object.keys(nets).forEach(function (name) {
+    (nets[name] || []).forEach(function (n) {
+      if ((n.family === "IPv4" || n.family === 4) && !n.internal) list.push("http://" + n.address + ":" + PORT + "/");
+    });
+  });
+  return list;
+}
+function isLoopbackHost(req) {
+  const h = String(req.headers.host || "").replace(/:\d+$/, "").replace(/^\[|\]$/g, "");
+  return h === "localhost" || h === "::1" || /^127\./.test(h);
+}
+// Адрес сайта для QR: PUBLIC_URL; если терминал открыт через localhost — адрес в локальной сети;
+// иначе пусто, и страница возьмёт адрес, с которого её открыли.
+function siteUrls(req) {
+  if (PUBLIC_URL) return [PUBLIC_URL + "/"];
+  return isLoopbackHost(req) ? lanUrls().slice(0, 1) : [];
+}
 function matrixCfg() {
   const s = setup.settings;
   return {
@@ -316,8 +389,52 @@ function handleApi(req, res, pathName, query, isHost, body) {
       return;
     }
     case "/api/info": {
-      const urls = PUBLIC_URL ? ['"' + PUBLIC_URL + '/"'] : [];
-      sendJson(res, '{"boot":"' + bootId + '","urls":[' + urls.join(",") + "]}");
+      sendJson(res, { boot: bootId, urls: siteUrls(req) });
+      return;
+    }
+    case "/api/terminal": {
+      if (!isHost) { sendText(res, 403, "Только ведущий (нужен ключ)"); return; }
+      sendJson(res, terminalInfo());
+      return;
+    }
+    case "/api/terminal/claim": {
+      // Сделать этот компьютер главным экраном (в том числе забрать его у другого компьютера).
+      if (req.method !== "POST") { sendText(res, 405, "POST only"); return; }
+      if (!isHost) { sendText(res, 403, "Только ведущий (нужен ключ)"); return; }
+      const b = parseJson(body);
+      if (!b || !validTerminalId(b.id)) { sendText(res, 400, "Нужен id терминала"); return; }
+      terminal.owner = String(b.id);
+      terminal.addr = clientAddr(req);
+      terminal.seen = nowMs();
+      sendJson(res, terminalInfo());
+      return;
+    }
+    case "/api/terminal/save": {
+      if (req.method !== "POST") { sendText(res, 405, "POST only"); return; }
+      if (!isHost) { sendText(res, 403, "Только ведущий (нужен ключ)"); return; }
+      const b = parseJson(body);
+      if (!b || !validTerminalId(b.id) || !b.game || typeof b.game !== "object") { sendText(res, 400, "Bad JSON"); return; }
+      // Главный экран уже на другом компьютере — этот должен остановиться.
+      if (terminal.owner !== "" && terminal.owner !== String(b.id)) {
+        sendRaw(res, 409, "application/json; charset=utf-8", JSON.stringify({ moved: true, addr: terminal.addr }));
+        return;
+      }
+      if (terminal.owner === "") terminal.addr = clientAddr(req); // например, после перезапуска сервера
+      terminal.owner = String(b.id);
+      terminal.seen = nowMs();
+      terminal.game = JSON.stringify(b.game);
+      terminal.clientNow = Number(b.now) || nowMs();
+      terminal.savedAt = nowMs();
+      gameDirty = true;
+      sendJson(res, { ok: true });
+      return;
+    }
+    case "/api/terminal/release": {
+      // Терминал закрыли: главный экран свободен, следующий компьютер займёт его без вопроса.
+      if (req.method !== "POST") { sendText(res, 405, "POST only"); return; }
+      const b = parseJson(body);
+      if (isHost && b && terminal.owner !== "" && String(b.id) === terminal.owner) terminal.seen = 0;
+      sendJson(res, { ok: true });
       return;
     }
     case "/api/setup": {
@@ -466,8 +583,7 @@ function handleApi(req, res, pathName, query, isHost, body) {
       const codes = loadCodes();
       const items = Object.keys(codes).sort(function (a, b) { return codes[a].localeCompare(codes[b]); })
         .map(function (code) { return '{"code":"' + code + '","folder":"' + codes[code].replace(/["\\]/g, "") + '"}'; });
-      const urls = PUBLIC_URL ? ['"' + PUBLIC_URL + '/"'] : [];
-      sendJson(res, '{"urls":[' + urls.join(",") + '],"items":[' + items.join(",") + "]}");
+      sendJson(res, '{"urls":' + JSON.stringify(siteUrls(req)) + ',"items":[' + items.join(",") + "]}");
       return;
     }
     default:
@@ -550,12 +666,23 @@ const server = http.createServer(function (req, res) {
   res.end(req.method === "HEAD" ? undefined : data);
 });
 
+function shutdown() { flushGame(); process.exit(0); }
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
 server.listen(PORT, function () {
   console.log("");
   console.log("  ПРОТОКОЛ «ЩИТ» — сервер для хостинга запущен");
   console.log("  -------------------------------------------------");
   console.log("  Порт: " + PORT);
+  const lan = lanUrls();
+  if (lan.length) {
+    console.log("  Адрес в локальной сети (открывайте на любом компьютере и телефоне):");
+    lan.forEach(function (u) { console.log("    " + u); });
+  }
   console.log("  Игроки и капитан открывают обычный адрес сайта.");
+  console.log("  Терминал защиты (главный экран) можно открыть на любом компьютере");
+  console.log("  и перенести на другой — прогресс игры хранится на сервере.");
   console.log("  Ведущий вводит ключ на терминале или открывает:  /?host=" + HOST_KEY);
   if (!process.env.HOST_KEY) {
     console.log("");

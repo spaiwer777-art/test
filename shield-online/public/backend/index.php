@@ -106,6 +106,42 @@ function need_host($isHost) {
     if (!$isHost) { shield_text(403, 'Только ведущий (нужен ключ ведущего)'); exit; }
 }
 
+// ---------- главный экран (терминал защиты) ----------
+// Полное состояние игры хранит сервер, поэтому терминал можно открыть на любом компьютере.
+// Главный экран один: другой компьютер ведущего может забрать его себе (terminal/claim),
+// тогда прежний получает отказ на сохранение и показывает заставку «экран перенесён».
+
+define('TERMINAL_ONLINE_MS', 15000);
+
+function valid_terminal_id($v) {
+    return is_string($v) && preg_match('/^[a-z0-9]{8,32}$/', $v);
+}
+
+function &terminal_of(&$st) {
+    if (!isset($st['terminal']) || !is_array($st['terminal'])) {
+        $st['terminal'] = array('owner' => '', 'addr' => '', 'seen' => 0, 'game' => 'null',
+            'clientNow' => 0, 'savedAt' => 0);
+    }
+    return $st['terminal'];
+}
+
+function terminal_info(&$st) {
+    $t = &terminal_of($st);
+    $now = shield_now();
+    $online = $t['owner'] !== '' && $t['seen'] > 0 && $now - $t['seen'] < TERMINAL_ONLINE_MS;
+    return '{"owner":' . json_encode($t['owner']) .
+        ',"addr":' . json_encode($t['addr']) .
+        ',"ownerOnline":' . ($online ? 'true' : 'false') .
+        ',"ownerAgoMs":' . ($t['seen'] ? $now - $t['seen'] : -1) .
+        ',"ageMs":' . ($t['savedAt'] ? $now - $t['savedAt'] : -1) .
+        ',"clientNow":' . (int) $t['clientNow'] .
+        ',"game":' . $t['game'] . '}';
+}
+
+function client_addr() {
+    return isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+}
+
 switch ($route) {
     case 'host':
         shield_json(array('configured' => shield_key_configured(), 'host' => $isHost));
@@ -187,6 +223,68 @@ switch ($route) {
                 shield_json('{"boot":"' . $st['boot'] . '","ageMs":' . $age . ',"state":' . $st['stateJson'] . '}');
             });
         }
+        break;
+
+    case 'terminal':
+        need_host($isHost);
+        shield_with_state(function (&$st) { shield_json(terminal_info($st)); });
+        break;
+
+    case 'terminal/claim':
+        // Сделать этот компьютер главным экраном (в том числе забрать его у другого компьютера).
+        need_post($method);
+        need_host($isHost);
+        if (!is_array($body) || !isset($body['id']) || !valid_terminal_id($body['id'])) {
+            shield_text(400, 'Нужен id терминала');
+            break;
+        }
+        shield_with_state(function (&$st) use ($body) {
+            $t = &terminal_of($st);
+            $t['owner'] = $body['id'];
+            $t['addr'] = client_addr();
+            $t['seen'] = shield_now();
+            unset($t);
+            shield_json(terminal_info($st));
+        });
+        break;
+
+    case 'terminal/save':
+        need_post($method);
+        need_host($isHost);
+        if (!is_array($body) || !isset($body['id']) || !valid_terminal_id($body['id'])
+            || !isset($body['game']) || !is_array($body['game']) || strlen($rawBody) > 1048576) {
+            shield_text(400, 'Bad JSON');
+            break;
+        }
+        shield_with_state(function (&$st) use ($body) {
+            $t = &terminal_of($st);
+            // Главный экран уже на другом компьютере — этот должен остановиться.
+            if ($t['owner'] !== '' && $t['owner'] !== $body['id']) {
+                http_response_code(409);
+                shield_json(array('moved' => true, 'addr' => $t['addr']));
+                return;
+            }
+            if ($t['owner'] === '') $t['addr'] = client_addr();
+            $t['owner'] = $body['id'];
+            $t['seen'] = shield_now();
+            // Пустой массив PHP закодировал бы как [], а не {} — объект игры храним как объект.
+            $t['game'] = json_encode((object) $body['game'], JSON_UNESCAPED_UNICODE);
+            $t['clientNow'] = isset($body['now']) ? (int) $body['now'] : shield_now();
+            $t['savedAt'] = shield_now();
+            shield_json(array('ok' => true));
+        });
+        break;
+
+    case 'terminal/release':
+        // Терминал закрыли: главный экран свободен, следующий компьютер займёт его без вопроса.
+        need_post($method);
+        if ($isHost && is_array($body) && isset($body['id'])) {
+            shield_with_state(function (&$st) use ($body) {
+                $t = &terminal_of($st);
+                if ($t['owner'] !== '' && $t['owner'] === (string) $body['id']) $t['seen'] = 0;
+            });
+        }
+        shield_json(array('ok' => true));
         break;
 
     case 'join':
