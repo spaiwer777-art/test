@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { Letters } from "../../carstory/kit";
+import { KText } from "../kinetic";
 import { A, display, E, mono, prog } from "../theme";
 
 // The "I" of "AI RACE" (mono font → exact geometry) is the doorway into scene 2.
@@ -78,8 +79,8 @@ export const S1Start: React.FC = () => {
               </span>
             ))}
           </div>
-          <div style={{ position: "absolute", top: LINE_TOP + 120, width: 1080, textAlign: "center", fontFamily: mono, fontSize: 34, letterSpacing: 8, color: A.grey, opacity: prog(f, 108, 10) }}>
-            1943 — 2026
+          <div style={{ position: "absolute", top: LINE_TOP + 120, width: 1080, display: "flex", justifyContent: "center" }}>
+            <KText text="1943 — 2026" start={104} mode="decode" stagger={1} font={mono} style={{ fontSize: 34, letterSpacing: 8, color: A.grey }} />
           </div>
         </AbsoluteFill>
       ) : null}

@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { Count } from "../../carstory/kit";
-import { Caption } from "../rigs";
+import { KCaption } from "../kinetic";
 import { A, body, display, E, mono, prog } from "../theme";
 
 const C = A.warm;
@@ -40,14 +40,20 @@ export const S8Scale: React.FC = () => {
       {/* Parameter count bars; the camera chases GPT-3 upward */}
       {f < 120 ? (
         <AbsoluteFill style={{ transform: `translateY(${camUp * 1700}px)`, filter: `blur(${camUp * 10}px)` }}>
-          <Caption year="2018 → 2020" title="Параметры моделей" start={2} accent={C} />
+          <KCaption mode="slice" year="2018 → 2020" title="Параметры моделей" start={2} accent={C} />
           {BARS.map((b, i) => {
             const grow = prog(f, b.start, b.name === "GPT-3" ? 50 : 14, b.name === "GPT-3" ? E.expoIn : E.backOut);
             const h = Math.max(4, PX[i] * grow);
             const x = 150 + i * 300;
+            const col = i === 2 ? A.red : C;
+            const D = 90;
             return (
               <React.Fragment key={b.name}>
-                <div style={{ position: "absolute", left: x, top: BASE - h, width: 180, height: h, background: i === 2 ? A.red : C, boxShadow: `0 0 40px ${i === 2 ? A.red : C}66`, opacity: prog(f, b.start, 4) }} />
+                <div style={{ position: "absolute", left: x, top: BASE - h, width: 180, height: h, transformStyle: "preserve-3d", transform: `perspective(1600px) rotateY(${-28 + Math.sin(f / 30) * 4}deg) rotateX(-8deg)`, transformOrigin: "50% 100%", opacity: prog(f, b.start, 4) }}>
+                  <div style={{ position: "absolute", inset: 0, background: col, boxShadow: `0 0 40px ${col}66` }} />
+                  <div style={{ position: "absolute", top: 0, left: 180, width: D, height: h, background: col, filter: "brightness(0.55)", transformOrigin: "0 0", transform: "rotateY(90deg)" }} />
+                  <div style={{ position: "absolute", top: 0, left: 0, width: 180, height: D, background: col, filter: "brightness(1.25)", transformOrigin: "0 0", transform: "rotateX(90deg)" }} />
+                </div>
                 <div style={{ position: "absolute", left: x - 40, width: 260, top: BASE + 24, textAlign: "center", fontFamily: mono, fontWeight: 700, fontSize: 40, color: A.text, opacity: prog(f, b.start, 6) }}>
                   {b.name}
                   <div style={{ fontSize: 26, color: A.grey }}>{b.year}</div>

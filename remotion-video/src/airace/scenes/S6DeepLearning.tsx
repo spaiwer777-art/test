@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { Count, Draw } from "../../carstory/kit";
-import { Caption } from "../rigs";
+import { KCaption } from "../kinetic";
 import { A, body, E, mono, prog } from "../theme";
 import { BOARD, CatMosaic } from "./S5Return";
 
@@ -52,18 +52,18 @@ export const S6DeepLearning: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
-      <Caption year="2012" title="AlexNet — прорыв в зрении" start={4} out={108} accent={C} />
-      <Caption year="2012 → 2024" title="Вычисления растут взрывом" start={116} out={200} accent={C} />
-      <Caption year="2016" title="AlphaGo — Ли Седоль" start={210} out={268} accent={C} />
+      <KCaption mode="flip" year="2012" title="AlexNet — прорыв в зрении" start={4} out={108} accent={C} />
+      <KCaption mode="slice" year="2012 → 2024" title="Вычисления растут взрывом" start={116} out={200} accent={C} />
+      <KCaption mode="elastic" year="2016" title="AlphaGo — Ли Седоль" start={210} out={268} accent={C} />
 
       {/* AlexNet: the image splits into feature maps fanning into depth */}
       <AbsoluteFill style={{ perspective: 1600, opacity: 1 - alexOut }}>
-        <AbsoluteFill style={{ transformStyle: "preserve-3d", transform: `rotateY(${-32 * fan}deg) translateX(${-fan * 120}px)` }}>
+        <AbsoluteFill style={{ transformStyle: "preserve-3d", transform: `rotateY(${-42 * fan + Math.sin(f / 25) * 4}deg) rotateX(${8 * fan}deg) translateX(${-fan * 140}px)` }}>
           {FEATURE_PALETTES.map((pal, i) => (
             <AbsoluteFill
               key={i}
               style={{
-                transform: `translateZ(${-i * 170 * fan}px) translateX(${i * 70 * fan}px)`,
+                transform: `translateZ(${-i * 210 * fan}px) translateX(${i * 80 * fan}px) rotateZ(${i * 2 * fan}deg)`,
                 opacity: i === 0 ? 1 : fan,
                 filter: i === 0 ? "none" : `drop-shadow(0 0 20px ${C}55)`,
               }}

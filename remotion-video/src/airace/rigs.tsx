@@ -53,8 +53,10 @@ export const GridBg: React.FC = () => {
   const f = useCurrentFrame();
   const c = accentAt(f);
   const off = (f * 0.6) % 40;
+  // the grid pulses on every beat (15 frames at 120 BPM)
+  const beat = Math.exp(-(f % 15) / 4);
   return (
-    <AbsoluteFill>
+    <AbsoluteFill style={{ opacity: 0.75 + beat * 0.25 }}>
       <AbsoluteFill
         style={{
           backgroundImage: `linear-gradient(${c}10 2px, transparent 2px), linear-gradient(90deg, ${c}10 2px, transparent 2px)`,

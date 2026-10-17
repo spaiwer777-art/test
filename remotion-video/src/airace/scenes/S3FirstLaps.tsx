@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, random, useCurrentFrame } from "remotion";
-import { Caption } from "../rigs";
+import { KCaption } from "../kinetic";
 import { A, body, E, mono, prog } from "../theme";
 
 const C = A.blue;
@@ -36,8 +36,8 @@ export const S3FirstLaps: React.FC = () => {
 
   const content = (
     <AbsoluteFill>
-      <Caption year="1958" title="Перцептрон" start={4} out={86} accent={C} />
-      <Caption year="1966" title="ELIZA — первый чат-бот" start={92} accent={C} />
+      <KCaption mode="elastic" year="1958" title="Перцептрон" start={4} out={86} accent={C} />
+      <KCaption mode="slice" year="1966" title="ELIZA — первый чат-бот" start={92} accent={C} />
 
       {/* Perceptron: lamps learn the letter A */}
       <AbsoluteFill style={{ transform: `translateY(${-percOut * 500}px) scale(${1 - percOut * 0.4})`, opacity: 1 - percOut }}>

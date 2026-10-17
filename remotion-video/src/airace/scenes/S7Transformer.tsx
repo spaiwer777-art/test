@@ -1,5 +1,6 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { KText } from "../kinetic";
 import { A, body, display, E, mono, prog } from "../theme";
 import { TOKEN_Y, TOKENS, tokenX } from "./S6DeepLearning";
 
@@ -57,8 +58,8 @@ export const S7Transformer: React.FC = () => {
         </div>
       </AbsoluteFill>
 
-      <div style={{ position: "absolute", top: 1440, width: 1080, textAlign: "center", fontFamily: display, fontWeight: 900, fontSize: 78, color: C, opacity: prog(f, 60, 12) * (1 - stretch), letterSpacing: -2 }}>
-        ТРАНСФОРМЕР
+      <div style={{ position: "absolute", top: 1440, width: 1080, display: "flex", justifyContent: "center", opacity: 1 - stretch }}>
+        <KText text="ТРАНСФОРМЕР" start={60} mode="elastic" stagger={1.6} font={display} style={{ fontWeight: 900, fontSize: 78, color: C, letterSpacing: -2 }} />
       </div>
 
       {/* Attention arcs over the token row */}

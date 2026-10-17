@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, interpolate, random, useCurrentFrame } from "remotion";
-import { Caption } from "../rigs";
+import { KCaption } from "../kinetic";
 import { A, body, E, mono, prog } from "../theme";
 
 const C = A.violet;
@@ -67,8 +67,8 @@ export const S5Return: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
-      <Caption year="1986" title="Обратное распространение ошибки" start={4} out={112} accent={C} />
-      <Caption year="1997" title="Deep Blue — Каспаров" start={124} accent={C} />
+      <KCaption mode="slice" year="1986" title="Обратное распространение ошибки" start={4} out={112} accent={C} />
+      <KCaption mode="flip" year="1997" title="Deep Blue — Каспаров" start={124} accent={C} />
 
       {/* Neural network training */}
       <AbsoluteFill style={{ opacity: 1 - netOut, transform: `scale(${1 - netOut * 0.2})` }}>

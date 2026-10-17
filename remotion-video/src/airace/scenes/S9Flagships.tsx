@@ -1,5 +1,6 @@
 import React from "react";
 import { AbsoluteFill, interpolate, random, useCurrentFrame } from "remotion";
+import { KText } from "../kinetic";
 import { A, body, display, E, mono, prog } from "../theme";
 
 const C = A.warm;
@@ -106,7 +107,9 @@ export const S9Flagships: React.FC = () => {
           return (
             <div key={m.text} style={{ position: "absolute", left: 0, right: 0, transform: `translateY(${(1 - pin) * 110 - pout * 110}%)`, textAlign: "center" }}>
               <div style={{ fontFamily: mono, fontSize: 28, color: A.grey, letterSpacing: 6 }}>ЭТАП {i + 1}/4</div>
-              <div style={{ fontFamily: display, fontWeight: 900, fontSize: m.text.length > 14 ? 62 : 80, color: C, letterSpacing: -1 }}>{m.text}</div>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <KText text={m.text} start={m.at} mode={i % 2 ? "slice" : "flip"} stagger={0.8} font={display} style={{ fontWeight: 900, fontSize: m.text.length > 14 ? 62 : 80, color: C, letterSpacing: -1 }} />
+              </div>
             </div>
           );
         })}
@@ -121,6 +124,9 @@ export const S9Flagships: React.FC = () => {
           const nameIdx = stage;
           const nameChange = prog(f, STAGES[stage], 10);
           const flash = moved > 0 ? A.green : moved < 0 ? A.red : null;
+          const lastChange = CHANGE_FRAMES.filter((c) => f >= c).pop() ?? -100;
+          const wasUp = lastChange >= 0 && ORDERS[CHANGE_FRAMES.indexOf(lastChange) + 1].indexOf(t) < ORDERS[CHANGE_FRAMES.indexOf(lastChange)].indexOf(t);
+          const flip = wasUp ? prog(f, lastChange, 12, E.expoInOut) % 1 : 0;
           return (
             <div
               key={team.lab}
@@ -135,7 +141,7 @@ export const S9Flagships: React.FC = () => {
                 borderRadius: 10,
                 display: "flex",
                 alignItems: "center",
-                transform: `scaleY(${1 - squash * 0.95}) scaleX(${1 - shrink})`,
+                transform: `perspective(1200px) rotateX(${flip * 360}deg) scaleY(${1 - squash * 0.95}) scaleX(${1 - shrink})`,
                 opacity: prog(f, 8 + t * 3, 8),
               }}
             >

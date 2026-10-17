@@ -96,6 +96,10 @@ const SFX: [string, number, number][] = [
   ...[1764, 1836, 1908, 1976].map((f) => ["maximize_006.ogg", f, 0.4] as [string, number, number]),
   ["forceField_000.ogg", 2040, 0.5],
   ["phaserUp1.ogg", 2074, 0.5],
+  // morph wipes
+  ["forceField_000.ogg", 378, 0.45],
+  ["forceField_000.ogg", 588, 0.45],
+  ["forceField_000.ogg", 1458, 0.45],
   // 10 — finish
   ["lowFrequency_explosion_001.ogg", 2100, 0.9],
   ["explosionCrunch_000.ogg", 2100, 0.6],

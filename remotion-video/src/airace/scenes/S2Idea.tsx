@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { Draw } from "../../carstory/kit";
-import { Caption } from "../rigs";
+import { KCaption } from "../kinetic";
 import { A, body, display, E, mono, prog } from "../theme";
 
 const C = A.blue;
@@ -31,9 +31,9 @@ export const S2Idea: React.FC = () => {
       <div style={{ position: "absolute", left: 0, right: 0, top: 957, height: 6, background: C, boxShadow: `0 0 40px ${C}`, opacity: trackFade }} />
 
       <AbsoluteFill style={{ transform: `scaleY(${1 - collapse * 0.985})`, transformOrigin: "50% 960px" }}>
-        <Caption year="1943" title="Модель нейрона" start={6} out={58} accent={C} />
-        <Caption year="1950" title="Алан Тьюринг" start={66} out={146} accent={C} />
-        <Caption year="1956" title="У науки появляется имя" start={152} out={214} accent={C} />
+        <KCaption mode="flip" year="1943" title="Модель нейрона" start={6} out={58} accent={C} />
+        <KCaption mode="slice" year="1950" title="Алан Тьюринг" start={66} out={146} accent={C} />
+        <KCaption mode="elastic" year="1956" title="У науки появляется имя" start={152} out={214} accent={C} />
 
         {/* McCulloch–Pitts neuron */}
         <AbsoluteFill style={{ transformOrigin: "540px 960px", transform: `translateY(${-neuronAway * 420}px) scale(${1 - neuronAway * 0.45})`, opacity: 1 - prog(f, 146, 10) }}>
