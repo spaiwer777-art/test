@@ -1,6 +1,7 @@
 import { Composition, Folder } from "remotion";
 import { AI_RACE_DURATION, AiRace } from "./airace/AiRace";
 import { CAR_STORY_DURATION, CarStory } from "./carstory/CarStory";
+import { Kinetic, KINETIC_DURATION } from "./kinetic/Kinetic";
 import { PluginVideo, TRANSITION_FRAMES } from "./PluginVideo";
 import { CodeScene } from "./scenes/CodeScene";
 import { IntroScene } from "./scenes/IntroScene";
@@ -39,6 +40,7 @@ export const RemotionRoot: React.FC = () => {
         durationInFrames={CAR_STORY_DURATION}
       />
       <Composition id="AiRace" component={AiRace} width={WIDTH} height={HEIGHT} fps={FPS} durationInFrames={AI_RACE_DURATION} />
+      <Composition id="Kinetic" component={Kinetic} width={WIDTH} height={HEIGHT} fps={60} durationInFrames={KINETIC_DURATION} />
     </>
   );
 };
